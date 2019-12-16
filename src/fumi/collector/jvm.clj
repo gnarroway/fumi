@@ -1,5 +1,5 @@
 (ns ^{:author "George Narroway"}
-  fumi.collector.jvm
+ fumi.collector.jvm
   "JVM collector"
   (:require [clojure.string :as string])
   (:import (java.lang.management ManagementFactory ThreadInfo ThreadMXBean MemoryMXBean MemoryUsage GarbageCollectorMXBean)))
@@ -77,12 +77,12 @@
       :type    :gauge
       :help    "Current count of threads by state."
       :samples (->>
-                 (merge
-                   (into {} (map (fn [^Thread$State t] [(.name t) 0]) (Thread$State/values)))
-                   (frequencies
-                     (map (fn [^ThreadInfo t] (-> t .getThreadState .name))
-                          (.getThreadInfo ^ThreadMXBean thread-bean (.getAllThreadIds ^ThreadMXBean thread-bean) 0))))
-                 (map (fn [[k v]] {:value v :labels {:state k}})))}
+                (merge
+                 (into {} (map (fn [^Thread$State t] [(.name t) 0]) (Thread$State/values)))
+                 (frequencies
+                  (map (fn [^ThreadInfo t] (-> t .getThreadState .name))
+                       (.getThreadInfo ^ThreadMXBean thread-bean (.getAllThreadIds ^ThreadMXBean thread-bean) 0))))
+                (map (fn [[k v]] {:value v :labels {:state k}})))}
 
      ;;; GC
      {:name    :jvm_gc_collection_seconds
@@ -102,8 +102,7 @@
       :sample [{:value  1
                 :labels (->> ["java.runtime.version" "java.vm.vendor" "java.runtime.name"]
                              (map (juxt #(-> (string/split % #"\.") last) #(System/getProperty % "unknown")))
-                             (into {}))}]}
-     ]))
+                             (into {}))}]}]))
 
 (comment
   (collect))

@@ -1,6 +1,6 @@
 # fumi
 
-A native Prometheus client for Clojure.
+A Prometheus client for Clojure.
 
 Features:
 

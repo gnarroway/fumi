@@ -1,5 +1,5 @@
 (ns ^{:author "George Narroway"}
-  fumi.client
+ fumi.client
   "Native clojure prometheus client"
   (:require [clojure.string :as string]
             [fumi.collector.jvm :as jvm]
@@ -47,6 +47,7 @@
 
 ;;; Implementation
 
+
 (defrecord Counter [name description label-names]
   Increaseable
   (-increase [this n {:keys [labels]}]
@@ -61,7 +62,7 @@
      :type    :counter
      :samples (map (fn [[k v]] (cond-> {:name   name
                                         :value  (:value v)}
-                                       (seq k) (assoc :labels k)))
+                                 (seq k) (assoc :labels k)))
                    (:labels this))}))
 
 (defrecord Gauge [name description label-names]
@@ -88,7 +89,7 @@
      :type    :gauge
      :samples (map (fn [[k v]] (cond-> {:name   name
                                         :value  (:value v)}
-                                       (seq k) (assoc :labels k)))
+                                 (seq k) (assoc :labels k)))
                    (:labels this))}))
 
 (defrecord Summary [name description label-names]
@@ -108,7 +109,7 @@
                     t [:count :sum]]
                 (cond-> {:name   (str (clojure.core/name name) "_" (clojure.core/name t))
                          :value  (t v)}
-                        (seq k) (assoc :labels k)))}))
+                  (seq k) (assoc :labels k)))}))
 
 (defrecord Histogram [name description label-names buckets]
   Observable
@@ -139,7 +140,7 @@
                               (map (fn [t]
                                      (cond-> {:name  (str (clojure.core/name name) "_" (clojure.core/name t))
                                               :value (t v)}
-                                             (seq k) (assoc :labels k))) [:count :sum])]))
+                                       (seq k) (assoc :labels k))) [:count :sum])]))
                    (apply concat))}))
 
 (defn counter
@@ -152,7 +153,7 @@
   - `:label-names` a list of strings or keywords"
   [name {:keys [description label-names] :or {label-names []}}]
   (cond-> (->Counter name description label-names)
-          (empty? label-names) (assoc :labels {nil {:value 0}})))
+    (empty? label-names) (assoc :labels {nil {:value 0}})))
 
 (defn gauge
   "Creates a gauge collector.
@@ -164,7 +165,7 @@
   - `:label-names` a list of strings or keywords"
   [name {:keys [description label-names] :or {label-names []}}]
   (cond-> (->Gauge name description label-names)
-          (empty? label-names) (assoc :labels {nil {:value 0}})))
+    (empty? label-names) (assoc :labels {nil {:value 0}})))
 
 (defn summary
   "Creates a summary collector.
@@ -200,6 +201,7 @@
 
 ;;; Registry
 
+
 (defn- init-collector
   "Create a collector and adds it to a map."
   [m metric-name {:keys [type description label-names] :as opts}]
@@ -210,11 +212,11 @@
          (#{:counter :gauge :summary :histogram} type)]}
 
   (assoc m metric-name
-           (case type
-             :counter (counter metric-name opts)
-             :gauge (gauge metric-name opts)
-             :summary (summary metric-name opts)
-             :histogram (histogram metric-name opts))))
+         (case type
+           :counter (counter metric-name opts)
+           :gauge (gauge metric-name opts)
+           :summary (summary metric-name opts)
+           :histogram (histogram metric-name opts))))
 
 (defn- init
   "Initialises from a config map.
@@ -224,7 +226,7 @@
   (cond-> (reduce (fn [acc [name opts]]
                     (init-collector acc name opts)) {} (:collectors config))
 
-          (not (:exclude-defaults? config)) (merge default-config)))
+    (not (:exclude-defaults? config)) (merge default-config)))
 
 (defn init!
   "Initialises a registry with config."
@@ -243,6 +245,7 @@
 
 
 ;;; Operations
+
 
 (defn- increase
   "Increase the value of a collector `c` by `n` (>= 0, default 1).
@@ -320,8 +323,8 @@
     (format "%s%s %s" (clojure.core/name (or name parent-name)) label-str value)))
 
 (defmulti serialize
-          "Serialize collected metrics to output format."
-          (fn [_ type] type))
+  "Serialize collected metrics to output format."
+  (fn [_ type] type))
 
 (defmethod serialize :default
   [metrics _]
@@ -335,10 +338,10 @@
 (comment
   ;; Create the registry with defaults
   (init!
-    {:exclude-defaults? false
-     :collectors        {:test_counter   {:type :counter :description "a counter" :label-names [:foo]}
-                         :test_gauge     {:type :gauge :description "a gauge"}
-                         :test_histogram {:type :histogram :description "a histogram"}}})
+   {:exclude-defaults? false
+    :collectors        {:test_counter   {:type :counter :description "a counter" :label-names [:foo]}
+                        :test_gauge     {:type :gauge :description "a gauge"}
+                        :test_histogram {:type :histogram :description "a histogram"}}})
 
   ;; Add more metrics
   (register! :another_counter {:type :counter :description "another counter"})
@@ -358,10 +361,10 @@
 (comment
   ;; Create separate registry
   (def my-registry (init!
-                     {:exclude-defaults? true
-                      :collectors        {:test_counter   {:type :counter :description "a counter" :label-names [:foo]}
-                                          :test_gauge     {:type :gauge :description "a gauge"}
-                                          :test_histogram {:type :histogram :description "a histogram"}}}))
+                    {:exclude-defaults? true
+                     :collectors        {:test_counter   {:type :counter :description "a counter" :label-names [:foo]}
+                                         :test_gauge     {:type :gauge :description "a gauge"}
+                                         :test_histogram {:type :histogram :description "a histogram"}}}))
 
   ;; Add more metrics
   (register! my-registry :another_counter {:type :counter :description "another counter"})
