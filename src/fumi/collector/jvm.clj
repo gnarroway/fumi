@@ -89,20 +89,22 @@
       :type    :summary
       :help    "Time spent in a given JVM garbage collector in seconds."
       :samples (mapcat (fn [^GarbageCollectorMXBean gc]
-                         [{:name  (string/replace (str (.getName gc) "_count") #"\s" "_")
-                           :value (.getCollectionCount gc)}]
-                         [{:name  (string/replace (str (.getName gc) "_sum") #"\s" "_")
-                           :value (double (/ (.getCollectionTime gc) 1000))}])
+                         [{:name  :jvm_gc_collection_seconds_count
+                           :value (.getCollectionCount gc)
+                           :labels {:gc (.getName gc)}}
+                          {:name  :jvm_gc_collection_seconds_sum
+                           :value (double (/ (.getCollectionTime gc) 1000))
+                           :labels {:gc (.getName gc)}}])
                        gc-beans)}
 
      ;;; Other
      {:name   :jvm_info
       :type   :gauge
       :help   "JVM version info"
-      :sample [{:value  1
-                :labels (->> ["java.runtime.version" "java.vm.vendor" "java.runtime.name"]
-                             (map (juxt #(-> (string/split % #"\.") last) #(System/getProperty % "unknown")))
-                             (into {}))}]}]))
+      :samples [{:value  1
+                 :labels (->> ["java.runtime.version" "java.vm.vendor" "java.runtime.name"]
+                              (map (juxt #(-> (string/split % #"\.") last) #(System/getProperty % "unknown")))
+                              (into {}))}]}]))
 
 (comment
   (collect))
