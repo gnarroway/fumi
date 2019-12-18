@@ -5,9 +5,7 @@
             [fumi.collector.jvm :as jvm]
             [fumi.collector.process :as process]))
 
-;;; Helpers
-
-(def default-registry (init! {}))
+(defonce default-registry (atom nil))
 (def metric-name-re #"[a-zA-Z_:][a-zA-Z0-9_:]*")
 (def label-name-re #"[a-zA-Z_][a-zA-Z0-9_]*")
 
@@ -328,12 +326,15 @@
 
 (defmethod serialize :default
   [metrics _]
-  (->> metrics
-       (map #(string/join "\n" (concat [(format "# HELP %s %s" (name (:name %)) (:help %))
-                                        (format "# HELP %s %s" (name (:name %)) (name (:type %)))]
+  (str (->> metrics
+            (map #(string/join "\n" (concat [(format "# HELP %s %s" (name (:name %)) (:help %))
+                                             (format "# HELP %s %s" (name (:name %)) (name (:type %)))]
 
-                                       (map (partial metric-row (:name %)) (:samples %)))))
-       (string/join "\n\n")))
+                                            (map (partial metric-row (:name %)) (:samples %)))))
+            (string/join "\n\n"))
+       "\n"))
+
+(init! default-registry)
 
 (comment
   ;; Create the registry with defaults
