@@ -8,6 +8,6 @@
                                     :username      :env/clojars_user
                                     :password      :env/clojars_pass
                                     :sign-releases false}]]
-  :plugins [[lein-cljfmt "0.6.4"]]
+  :plugins [[lein-cljfmt "0.6.6"]]
 
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.10.1"]]}})
