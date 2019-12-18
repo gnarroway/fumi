@@ -1,5 +1,8 @@
 # fumi
 
+[![Clojars Project](https://img.shields.io/clojars/v/fumi.svg)](https://clojars.org/fumi)
+
+
 A Prometheus client for Clojure.
 
 Features:
@@ -19,7 +22,7 @@ Please try it out and raise any issues you may find.
 For Leinengen, add this to your project.clj:
 
 ```clojure
-[fumi "0.1.0"]
+[fumi "0.1.0-SNAPSHOT"]
 ```
 
 ## Getting started
