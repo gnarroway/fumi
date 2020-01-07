@@ -227,19 +227,34 @@
     (not (:exclude-defaults? config)) (merge default-config)))
 
 (defn init!
-  "Initialises a registry with config."
-  ([config]
-   (init! default-registry config))
-  ([registry config]
-   (reset! registry (init config))
-   registry))
+  "Initialises a registry with config.
+
+  `config` is a map of keys:
+
+  - `:name` (optional) if not specified, the default registry will be used.
+  - `:exclude-defaults?` (optional) exclude default collectors when set to true (default false).
+  - `:collectors` a map of collector name to collector spec maps with keys:
+    - `:type` :counter, :gauge, :histogram, :summary.
+    - `:description` a string describing the metric.
+    - `:label-names` (optional) a list of string/keyword dimensions of this metric."
+  [config]
+  (let [registry (if (:name config) (atom nil) default-registry)]
+    (reset! registry (init config))
+    registry))
 
 (defn register!
-  "Register a collector."
-  ([name opts]
-   (register! default-registry name opts))
-  ([registry name opts]
-   (swap! registry #(init-collector % name opts))))
+  "Register a collector.
+
+  `name` is the name of the metric.
+  `opts` is a map of:
+
+  - `:type` :counter, :gauge, :histogram, :summary.
+  - `:description` a string describing the metric.
+  - `:label-names` (optional) a list of string/keyword dimensions of this metric.
+  - `:registry` (optional) the result of calling init!. If not specified, uses the default-registry."
+  [name opts]
+  (let [registry (or (:registry opts) default-registry)]
+    (swap! registry #(init-collector % name opts))))
 
 
 ;;; Operations
@@ -278,27 +293,32 @@
   (-observe c n opts))
 
 (defn increase!
-  ([name opts] (increase! default-registry name opts))
-  ([registry name opts]
-   (swap! registry update name increase opts)))
+  ([name] (increase! name {}))
+  ([name opts]
+   (let [r (or (:registry opts) default-registry)]
+     (swap! r update name increase opts))))
 
 (defn decrease!
-  ([name opts] (decrease! default-registry name opts))
-  ([registry name opts]
-   (swap! registry update name decrease opts)))
+  ([name] (decrease! name {}))
+  ([name opts]
+   (let [r (or (:registry opts) default-registry)]
+     (swap! r update name decrease opts))))
 
 (defn set-n!
-  ([name n opts] (set-n! default-registry name n opts))
-  ([registry name n opts]
-   (swap! registry update name set-n n opts)))
+  ([name n] (set-n! name n {}))
+  ([name n opts]
+   (let [r (or (:registry opts) default-registry)]
+     (swap! r update name set-n n opts))))
 
 (defn observe!
-  ([name n opts] (observe! default-registry name n opts))
-  ([registry name n opts]
-   (swap! registry update name observe n opts)))
+  ([name n] (observe! name n {}))
+  ([name n opts]
+   (let [r (or (:registry opts) default-registry)]
+     (swap! r update name observe n opts))))
 
 (defn collect
-  "Collects stats from one or more registries into a list of metrics."
+  "Collects stats from one or more registries into a list of metrics.
+  Default registry is always included."
   ([] (collect default-registry))
   ([registry & registries] (->> (conj registries registry default-registry)
                                 (distinct)
@@ -362,18 +382,19 @@
 (comment
   ;; Create separate registry
   (def my-registry (init!
-                    {:exclude-defaults? true
+                    {:name "my-registry"
+                     :exclude-defaults? true
                      :collectors        {:test_counter   {:type :counter :description "a counter" :label-names [:foo]}
                                          :test_gauge     {:type :gauge :description "a gauge"}
                                          :test_histogram {:type :histogram :description "a histogram"}}}))
 
   ;; Add more metrics
-  (register! my-registry :another_counter {:type :counter :description "another counter"})
+  (register! :another_counter {:type :counter :description "another counter" :registry my-registry})
 
   ;; Observe some values
-  (increase! my-registry :test_counter {:n 3 :labels {:foo "bar"}})
-  (set-n! my-registry :test_gauge 2.1 {})
-  (observe! my-registry :test_histogram 0.51 {})
+  (increase! :test_counter {:n 3 :labels {:foo "bar"} :registry my-registry})
+  (set-n! :test_gauge 2.1 {:registry my-registry})
+  (observe! :test_histogram 0.51 {:registry my-registry})
 
   (deref my-registry)
 

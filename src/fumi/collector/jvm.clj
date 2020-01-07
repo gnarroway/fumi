@@ -11,9 +11,9 @@
 (def gc-beans (ManagementFactory/getGarbageCollectorMXBeans))
 
 (defn- memory-by-area
-  [heap non-heap f]
+  [heap nonheap f]
   [{:value (f heap) :labels {:area "heap"}}
-   {:value (f non-heap) :labels {:area "non-heap"}}])
+   {:value (f nonheap) :labels {:area "nonheap"}}])
 
 (defn collect
   "Returns a store of JVM related metrics."
@@ -89,18 +89,18 @@
       :type    :summary
       :help    "Time spent in a given JVM garbage collector in seconds."
       :samples (mapcat (fn [^GarbageCollectorMXBean gc]
-                         [{:name  :jvm_gc_collection_seconds_count
-                           :value (.getCollectionCount gc)
+                         [{:name   :jvm_gc_collection_seconds_count
+                           :value  (.getCollectionCount gc)
                            :labels {:gc (.getName gc)}}
-                          {:name  :jvm_gc_collection_seconds_sum
-                           :value (double (/ (.getCollectionTime gc) 1000))
+                          {:name   :jvm_gc_collection_seconds_sum
+                           :value  (double (/ (.getCollectionTime gc) 1000))
                            :labels {:gc (.getName gc)}}])
                        gc-beans)}
 
      ;;; Other
-     {:name   :jvm_info
-      :type   :gauge
-      :help   "JVM version info"
+     {:name    :jvm_info
+      :type    :gauge
+      :help    "JVM version info"
       :samples [{:value  1
                  :labels (->> ["java.runtime.version" "java.vm.vendor" "java.runtime.name"]
                               (map (juxt #(-> (string/split % #"\.") last) #(System/getProperty % "unknown")))
