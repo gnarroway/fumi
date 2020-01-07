@@ -1,4 +1,4 @@
-(defproject fumi "0.1.0-SNAPSHOT"
+(defproject fumi "0.1.0-alpha"
   :description "A Prometheus client for Clojure."
   :url "https://github.com/gnarroway/fumi"
   :license {:name         "The MIT License"
