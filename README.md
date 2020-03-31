@@ -22,7 +22,7 @@ Please try it out and raise any issues you may find.
 For Leinengen, add this to your project.clj:
 
 ```clojure
-[fumi "0.1.0-SNAPSHOT"]
+[fumi "0.1.0-alpha"]
 ```
 
 ## Getting started
@@ -71,6 +71,53 @@ fumi also allows you to use separate registries or hold onto references (e.g. to
 ;; Output
 (-> (collect my-registry)
     (serialize :text))
+```
+
+## Metric types
+
+fumi supports the standard prometheus [metric types](https://prometheus.io/docs/concepts/metric_types/)
+(counter, gauge, summary, histogram). They are defined through a data driven API either during
+initial setup of a registry via `init!`, or later on via `register!`.
+ 
+In either case, the metric must be identified by a keyword (e.g. `:my-counter`), and takes these options:
+- `:type` is a keyword corresponding to one of the metric types (`:counter`, `:gauge`, `:summary`, `:histogram`)
+- `:description` is a short string description
+- `:label-names` (optional) is a list of keywords. If supplied, any operation on the metric needs a 
+  corresponding `:labels` map providing a value for each label-name
+  
+Histograms takes a further option:
+- `:buckets` (optional), defaulting to `[0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]`
+
+### Operations
+
+These are documented in more details in the [API docs](https://cljdoc.org/d/fumi/fumi/0.1.0-alpha/api/fumi.client).
+
+#### Counter
+
+A counter can only increase.
+
+```clojure
+(increase! :my-counter)
+(increase! :another-counter {:n 3 :labels {:uri "/home"}})
+```
+
+#### Gauge
+
+A gauge can go up or down, or be set to a specific number.
+
+```clojure
+(increase! :my-gauge)
+(decrease! :my-gauge {:n 2})
+(set-n! :my-gauge 3.2)
+```
+
+#### Summary and Histogram
+
+These metric types create a distribution based on observations. 
+
+```clojure
+(observe! :my-summary 3.2)
+(observe! :my-histogram 4.7)
 ```
 
 ## Built-in collectors

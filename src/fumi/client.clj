@@ -58,8 +58,8 @@
     {:name    name
      :help    description
      :type    :counter
-     :samples (map (fn [[k v]] (cond-> {:name   name
-                                        :value  (:value v)}
+     :samples (map (fn [[k v]] (cond-> {:name  name
+                                        :value (:value v)}
                                  (seq k) (assoc :labels k)))
                    (:labels this))}))
 
@@ -85,8 +85,8 @@
     {:name    name
      :help    description
      :type    :gauge
-     :samples (map (fn [[k v]] (cond-> {:name   name
-                                        :value  (:value v)}
+     :samples (map (fn [[k v]] (cond-> {:name  name
+                                        :value (:value v)}
                                  (seq k) (assoc :labels k)))
                    (:labels this))}))
 
@@ -105,8 +105,8 @@
      :type    :summary
      :samples (for [[k v] (:labels this)
                     t [:count :sum]]
-                (cond-> {:name   (str (clojure.core/name name) "_" (clojure.core/name t))
-                         :value  (t v)}
+                (cond-> {:name  (str (clojure.core/name name) "_" (clojure.core/name t))
+                         :value (t v)}
                   (seq k) (assoc :labels k)))}))
 
 (defrecord Histogram [name description label-names buckets]
@@ -261,59 +261,96 @@
 
 
 (defn- increase
-  "Increase the value of a collector `c` by `n` (>= 0, default 1).
-  If the collector has `label-names` defined, `labels` - a map of label name to value - must be provided."
   [c {:keys [n labels] :or {n 1} :as opts}]
   {:pre [(pos? n)
          (= (set (:label-names c)) (set (keys labels)))]}
   (-increase c n opts))
 
 (defn- decrease
-  "Decrease the value of a collector `c` by `n` (>= 0, default 1).
-  If the collector has `label-names` defined, `labels` - a map of label name to value - must be provided."
   [c {:keys [n labels] :or {n 1} :as opts}]
   {:pre [(pos? n)
          (= (set (:label-names c)) (set (keys labels)))]}
   (-decrease c n opts))
 
 (defn- set-n
-  "Sets the value of a collector `c` to `n`.
-  If the collector has `label-names` defined, `labels` - a map of label name to value - must be provided."
   [c n {:keys [labels] :as opts}]
   {:pre [(number? n)
          (= (set (:label-names c)) (set (keys labels)))]}
   (-set c n opts))
 
 (defn- observe
-  "Observe value `n` for collector `c`.
-  If the collector has `label-names` defined, `labels` - a map of label name to value - must be provided."
   [c n {:keys [labels] :as opts}]
   {:pre [(number? n)
          (= (set (:label-names c)) (set (keys labels)))]}
   (-observe c n opts))
 
+(defn- throw-if-not-registered
+  [r name]
+  (when-not (contains? r name)
+    (throw (IllegalArgumentException. (format "%s has not been registered." name)))))
+
 (defn increase!
+  "Increase the value of a collector identified by `name`.
+
+  Arguments:
+
+  - `name` a name the collector was registered with
+  - `opts` (optional), a map of:
+    - `:n` a positive number to increase the value of the collector by (default 1)`\n
+    - `:labels` a map of label name to value - must be provided if the collector has `label-names` defined.
+    - `:registry` a registry (as returned from `init!`) if not using the default-registry"
   ([name] (increase! name {}))
   ([name opts]
    (let [r (or (:registry opts) default-registry)]
+     (throw-if-not-registered @r name)
      (swap! r update name increase opts))))
 
 (defn decrease!
+  "Decrease the value of a collector `c` by `n` (> 0, default 1).
+
+  Arguments:
+
+  - `name` a name the collector was registered with
+  - `opts` (optional), a map of:
+    - `:n` a positive number to decrease the value of the collector by (default 1)`
+    - `:labels` a map of label name to value - must be provided if the collector has `label-names` defined.
+    - `:registry` a registry (as returned from `init!`) if not using the default-registry"
   ([name] (decrease! name {}))
   ([name opts]
    (let [r (or (:registry opts) default-registry)]
+     (throw-if-not-registered @r name)
      (swap! r update name decrease opts))))
 
 (defn set-n!
+  "Sets the value of a collector `c` to `n`.
+
+  Arguments:
+
+  - `name` a name the collector was registered with
+  - `:n` a number to set the value of the collector to`
+  - `opts` (optional), a map of:
+    - `:labels` a map of label name to value - must be provided if the collector has `label-names` defined.
+    - `:registry` a registry (as returned from `init!`) if not using the default-registry"
   ([name n] (set-n! name n {}))
   ([name n opts]
    (let [r (or (:registry opts) default-registry)]
+     (throw-if-not-registered @r name)
      (swap! r update name set-n n opts))))
 
 (defn observe!
+  "Observe value `n` for collector `c`.
+
+  Arguments:
+
+  - `name` a name the collector was registered with
+  - `:n` a number to set the value of the collector to`
+  - `opts` (optional), a map of:
+    - `:labels` a map of label name to value - must be provided if the collector has `label-names` defined.
+    - `:registry` a registry (as returned from `init!`) if not using the default-registry"
   ([name n] (observe! name n {}))
   ([name n opts]
    (let [r (or (:registry opts) default-registry)]
+     (throw-if-not-registered @r name)
      (swap! r update name observe n opts))))
 
 (defn collect
@@ -382,7 +419,7 @@
 (comment
   ;; Create separate registry
   (def my-registry (init!
-                    {:name "my-registry"
+                    {:name              "my-registry"
                      :exclude-defaults? true
                      :collectors        {:test_counter   {:type :counter :description "a counter" :label-names [:foo]}
                                          :test_gauge     {:type :gauge :description "a gauge"}
