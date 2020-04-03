@@ -1,7 +1,8 @@
 (ns ^{:author "George Narroway"}
  fumi.collector.process
   "Process collector"
-  (:require [clojure.string :as string])
+  (:require [clojure.string :as string]
+            [fumi.collector :as c])
   (:import (java.lang.management ManagementFactory)))
 
 (def ^:const milliseconds-per-second 1000.0)
@@ -82,5 +83,10 @@
       :help    "Virtual memory size in bytes."
       :samples (from-val (memory-stat proc-status "VmSize:"))}]))
 
-(comment
-  (collect))
+(deftype ProcessCollector []
+  c/Collectable
+  (-collect [_] (collect)))
+
+(defn collector
+  []
+  (->ProcessCollector))

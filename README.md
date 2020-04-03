@@ -56,11 +56,11 @@ fumi also allows you to use separate registries or hold onto references (e.g. to
 
 
 ```clojure 
-;; Create your registry by using the :name argument and holding on to the result
+;; Create your registry by using the :self-managed? argument and holding on to the result
 (def my-registry 
-  (init! {:name "my-registry"
+  (init! {:self-managed?     true
           :exclude-defaults? true
-          :collectors        {:test_counter   {:type :counter :description "a counter" :label-names [:foo]}}}))
+          :collectors        {:test_counter {:type :counter :description "a counter" :label-names [:foo]}}}))
 
 ;; Add more metrics to it
 (register! :another_counter {:type :counter :description "another counter" :registry my-registry})

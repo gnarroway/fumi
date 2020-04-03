@@ -1,7 +1,8 @@
 (ns ^{:author "George Narroway"}
  fumi.collector.jvm
   "JVM collector"
-  (:require [clojure.string :as string])
+  (:require [clojure.string :as string]
+            [fumi.collector :as c])
   (:import (java.lang.management ManagementFactory ThreadInfo ThreadMXBean MemoryMXBean MemoryUsage GarbageCollectorMXBean)))
 
 (set! *warn-on-reflection* true)
@@ -106,5 +107,10 @@
                               (map (juxt #(-> (string/split % #"\.") last) #(System/getProperty % "unknown")))
                               (into {}))}]}]))
 
-(comment
-  (collect))
+(deftype JvmCollector []
+  c/Collectable
+  (-collect [_] (collect)))
+
+(defn collector
+  []
+  (->JvmCollector))

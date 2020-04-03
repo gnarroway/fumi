@@ -3,218 +3,19 @@
   "Native clojure prometheus client"
   (:require [clojure.string :as string]
             [fumi.collector.jvm :as jvm]
-            [fumi.collector.process :as process]))
+            [fumi.collector.process :as process]
+            [fumi.collector :as collector]
+            [fumi.collector :as metric]))
 
 (defonce default-registry (atom nil))
-(def metric-name-re #"[a-zA-Z_:][a-zA-Z0-9_:]*")
-(def label-name-re #"[a-zA-Z_][a-zA-Z0-9_]*")
-
-;;; Protocols
-
-(defprotocol Increaseable
-  (-increase [this n opts] "Increase value by `n`, optionally for map `opts.labels`"))
-
-(defprotocol Decreaseable
-  (-decrease [this n opts] "Decrease value by `n`, optionally for map `opts.labels`"))
-
-(defprotocol Setable
-  (-set [this n opts] "Set value to `n`, optionally for map `opts.labels`"))
-
-(defprotocol Observable
-  (-observe [this n opts] "Observes value `n`, optionally for a map `opts.labels`"))
-
-(defprotocol Collectable
-  (-collect [this]
-    "Returns a list of maps with keys:
-
-    - `:name` string or kw
-    - `:help` string
-    - `:type` :counter, :gauge, :summary, :histogram
-    - `:samples` a list of maps with keys:
-      - `:value` number
-      - `:labels` (optional) map of label key to value
-      - `:name` (optional) string or kw to override the name of the collector in the output"))
 
 (def default-config
-  {:jvm_family     (reify Collectable
-                     (-collect [_] (jvm/collect)))
-
-   :process_family (reify Collectable
-                     (-collect [_] (process/collect)))})
-
-
-;;; Implementation
-
-
-(defrecord Counter [name description label-names]
-  Increaseable
-  (-increase [this n {:keys [labels]}]
-    (update-in this [:labels labels]
-               (fn [{:keys [value] :or {value 0}}]
-                 {:value (+ value n)})))
-
-  Collectable
-  (-collect [this]
-    {:name    name
-     :help    description
-     :type    :counter
-     :samples (map (fn [[k v]] (cond-> {:name  name
-                                        :value (:value v)}
-                                 (seq k) (assoc :labels k)))
-                   (:labels this))}))
-
-(defrecord Gauge [name description label-names]
-  Increaseable
-  (-increase [this n {:keys [labels]}]
-    (update-in this [:labels labels]
-               (fn [{:keys [value] :or {value 0}}]
-                 {:value (+ value n)})))
-
-  Decreaseable
-  (-decrease [this n {:keys [labels]}]
-    (update-in this [:labels labels]
-               (fn [{:keys [value] :or {value 0}}]
-                 {:value (- value n)})))
-
-  Setable
-  (-set [this n {:keys [labels]}]
-    (assoc-in this [:labels labels :value] n))
-
-  Collectable
-  (-collect [this]
-    {:name    name
-     :help    description
-     :type    :gauge
-     :samples (map (fn [[k v]] (cond-> {:name  name
-                                        :value (:value v)}
-                                 (seq k) (assoc :labels k)))
-                   (:labels this))}))
-
-(defrecord Summary [name description label-names]
-  Observable
-  (-observe [this x {:keys [labels]}]
-    (update-in this [:labels labels]
-               (fn [v] (-> v
-                           (update :sum (fnil + 0) x)
-                           (update :count (fnil inc 0))))))
-
-  Collectable
-  (-collect [this]
-    {:name    name
-     :help    description
-     :type    :summary
-     :samples (for [[k v] (:labels this)
-                    t [:count :sum]]
-                (cond-> {:name  (str (clojure.core/name name) "_" (clojure.core/name t))
-                         :value (t v)}
-                  (seq k) (assoc :labels k)))}))
-
-(defrecord Histogram [name description label-names buckets]
-  Observable
-  (-observe [this x {:keys [labels]}]
-    (let [b (first (remove #(< % x) buckets))]
-      (update-in this [:labels labels]
-                 (fn [v] (-> v
-                             (update-in [:bucket-values b] (fnil inc 0))
-                             (update :sum (fnil + 0) x)
-                             (update :count (fnil inc 0)))))))
-
-  Collectable
-  (-collect [this]
-    {:name    name
-     :help    description
-     :type    :histogram
-     :samples (->> (:labels this)
-                   (mapcat (fn [[k v]]
-                             [(let [cumulative-buckets (reduce (fn [acc x]
-                                                                 (assoc acc x (+ (or (get-in v [:bucket-values x]) 0)
-                                                                                 (apply max (or (vals acc) [0]))))) {}
-                                                               buckets)]
-                                (map (fn [b] {:name   (str (clojure.core/name name) "_buckets")
-                                              :labels (assoc k :le (if (= (Double/POSITIVE_INFINITY) b) "+Inf" (str b)))
-                                              :value  (cumulative-buckets b)})
-                                     buckets))
-
-                              (map (fn [t]
-                                     (cond-> {:name  (str (clojure.core/name name) "_" (clojure.core/name t))
-                                              :value (t v)}
-                                       (seq k) (assoc :labels k))) [:count :sum])]))
-                   (apply concat))}))
-
-(defn counter
-  "Creates a counter collector.
-
-  `name` a keyword compliant with prometheus naming.
-  `options` a map of:
-
-  - `:description`
-  - `:label-names` a list of strings or keywords"
-  [name {:keys [description label-names] :or {label-names []}}]
-  (cond-> (->Counter name description label-names)
-    (empty? label-names) (assoc :labels {nil {:value 0}})))
-
-(defn gauge
-  "Creates a gauge collector.
-
-  `name` a keyword compliant with prometheus naming.
-  `options` a map of:
-
-  - `:description`
-  - `:label-names` a list of strings or keywords"
-  [name {:keys [description label-names] :or {label-names []}}]
-  (cond-> (->Gauge name description label-names)
-    (empty? label-names) (assoc :labels {nil {:value 0}})))
-
-(defn summary
-  "Creates a summary collector.
-
-  `name` a keyword compliant with prometheus naming.
-  `options` a map of:
-
-  - `:description`
-  - `:label-names` a list of strings or keywords"
-  [name {:keys [description label-names] :or {label-names []}}]
-  {:pre [(not (.contains (map keyword label-names) :quantile))]}
-  (->Summary name description label-names))
-
-(defn histogram
-  "Creates a histogram collector.
-
-  `name` a keyword compliant with prometheus naming.
-  `options` a map of:
-
-  - `:description`
-  - `:label-names` a list of strings or keywords
-  - `:buckets` a list of increasing bucket cutoffs. +Inf will be appended to the end.
-    Defaults to [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]"
-  [name {:keys [description label-names buckets]
-         :or   {label-names [] buckets [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]}}]
-  {:pre [(not (.contains (map keyword label-names) :le))
-         (seq buckets)
-         (apply < buckets)]}
-  (let [buckets (distinct (conj (vec buckets) (Double/POSITIVE_INFINITY)))]
-    (-> (->Histogram name description label-names buckets)
-        (assoc :bucket-values {}))))
+  {:jvm_family     (jvm/collector)
+   :process_family (process/collector)})
 
 
 ;;; Registry
 
-
-(defn- init-collector
-  "Create a collector and adds it to a map."
-  [m metric-name {:keys [type description label-names] :as opts}]
-  {:pre [(keyword? metric-name)
-         (re-matches metric-name-re (name metric-name))
-         (every? #(re-matches label-name-re (name %)) label-names)
-         (string? description)
-         (#{:counter :gauge :summary :histogram} type)]}
-
-  (assoc m metric-name
-         (case type
-           :counter (counter metric-name opts)
-           :gauge (gauge metric-name opts)
-           :summary (summary metric-name opts)
-           :histogram (histogram metric-name opts))))
 
 (defn- init
   "Initialises from a config map.
@@ -222,67 +23,46 @@
   Returns a map of collectors."
   [config]
   (cond-> (reduce (fn [acc [name opts]]
-                    (init-collector acc name opts)) {} (:collectors config))
+                    (assoc acc name (metric/->collector name opts))) {} (:collectors config))
 
     (not (:exclude-defaults? config)) (merge default-config)))
 
 (defn init!
   "Initialises a registry with config.
 
-  `config` is a map of keys:
+  `config` is a map of:
 
-  - `:name` (optional) if not specified, the default registry will be used.
+  - `:self-managed?` (optional) if true, the default registry will not be used.
   - `:exclude-defaults?` (optional) exclude default collectors when set to true (default false).
-  - `:collectors` a map of collector name to collector spec maps with keys:
+  - `:collectors` a map of collector name to either a `Collectable`, or an options map with keys:
     - `:type` :counter, :gauge, :histogram, :summary.
     - `:description` a string describing the metric.
-    - `:label-names` (optional) a list of string/keyword dimensions of this metric."
+    - `:label-names` (optional) a list of string/keyword dimensions of this metric.
+    - `:buckets` (optional, only for histogram), defaulting to `[0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]`."
   [config]
-  (let [registry (if (:name config) (atom nil) default-registry)]
+  (let [registry (if (:self-managed? config) (atom nil) default-registry)]
     (reset! registry (init config))
     registry))
 
 (defn register!
   "Register a collector.
 
-  `name` is the name of the metric.
-  `opts` is a map of:
+  Arguments:
 
-  - `:type` :counter, :gauge, :histogram, :summary.
-  - `:description` a string describing the metric.
-  - `:label-names` (optional) a list of string/keyword dimensions of this metric.
-  - `:registry` (optional) the result of calling init!. If not specified, uses the default-registry."
+  - `name` is the name of the metric.
+  - `opts` is a map of:
+    - `:type` :counter, :gauge, :histogram, :summary.
+    - `:description` a string describing the metric.
+    - `:label-names` (optional) a list of string/keyword dimensions of this metric.
+    - `:buckets` (optional, only for histogram), defaulting to `[0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]`.
+    - `:registry` (optional) the result of calling init!. If not specified, uses the default-registry."
   [name opts]
   (let [registry (or (:registry opts) default-registry)]
-    (swap! registry #(init-collector % name opts))))
+    (swap! registry assoc name (metric/->collector name opts))))
 
+(init! default-registry)
 
 ;;; Operations
-
-
-(defn- increase
-  [c {:keys [n labels] :or {n 1} :as opts}]
-  {:pre [(pos? n)
-         (= (set (:label-names c)) (set (keys labels)))]}
-  (-increase c n opts))
-
-(defn- decrease
-  [c {:keys [n labels] :or {n 1} :as opts}]
-  {:pre [(pos? n)
-         (= (set (:label-names c)) (set (keys labels)))]}
-  (-decrease c n opts))
-
-(defn- set-n
-  [c n {:keys [labels] :as opts}]
-  {:pre [(number? n)
-         (= (set (:label-names c)) (set (keys labels)))]}
-  (-set c n opts))
-
-(defn- observe
-  [c n {:keys [labels] :as opts}]
-  {:pre [(number? n)
-         (= (set (:label-names c)) (set (keys labels)))]}
-  (-observe c n opts))
 
 (defn- throw-if-not-registered
   [r name]
@@ -290,7 +70,7 @@
     (throw (IllegalArgumentException. (format "%s has not been registered." name)))))
 
 (defn increase!
-  "Increase the value of a collector identified by `name`.
+  "Increase the value of a collector `name`.
 
   Arguments:
 
@@ -303,10 +83,10 @@
   ([name opts]
    (let [r (or (:registry opts) default-registry)]
      (throw-if-not-registered @r name)
-     (swap! r update name increase opts))))
+     (swap! r update name metric/increase opts))))
 
 (defn decrease!
-  "Decrease the value of a collector `c` by `n` (> 0, default 1).
+  "Decrease the value of collector `name`.
 
   Arguments:
 
@@ -319,15 +99,15 @@
   ([name opts]
    (let [r (or (:registry opts) default-registry)]
      (throw-if-not-registered @r name)
-     (swap! r update name decrease opts))))
+     (swap! r update name metric/decrease opts))))
 
 (defn set-n!
-  "Sets the value of a collector `c` to `n`.
+  "Sets the value of a collector `name` to `n`.
 
   Arguments:
 
   - `name` a name the collector was registered with
-  - `:n` a number to set the value of the collector to`
+  - `n` a number to set the value of the collector to`
   - `opts` (optional), a map of:
     - `:labels` a map of label name to value - must be provided if the collector has `label-names` defined.
     - `:registry` a registry (as returned from `init!`) if not using the default-registry"
@@ -335,15 +115,15 @@
   ([name n opts]
    (let [r (or (:registry opts) default-registry)]
      (throw-if-not-registered @r name)
-     (swap! r update name set-n n opts))))
+     (swap! r update name metric/set-n n opts))))
 
 (defn observe!
-  "Observe value `n` for collector `c`.
+  "Observe value `n` for collector `name`.
 
   Arguments:
 
   - `name` a name the collector was registered with
-  - `:n` a number to set the value of the collector to`
+  - `n` a number to set the value of the collector to`
   - `opts` (optional), a map of:
     - `:labels` a map of label name to value - must be provided if the collector has `label-names` defined.
     - `:registry` a registry (as returned from `init!`) if not using the default-registry"
@@ -351,7 +131,7 @@
   ([name n opts]
    (let [r (or (:registry opts) default-registry)]
      (throw-if-not-registered @r name)
-     (swap! r update name observe n opts))))
+     (swap! r update name metric/observe n opts))))
 
 (defn collect
   "Collects stats from one or more registries into a list of metrics.
@@ -361,7 +141,7 @@
                                 (distinct)
                                 (map deref)
                                 (apply merge)
-                                (map (comp -collect val))
+                                (map (comp collector/-collect val))
                                 (reduce (fn [acc x] (if (sequential? x)
                                                       (concat acc x)
                                                       (conj acc x))) []))))
@@ -391,8 +171,6 @@
             (string/join "\n\n"))
        "\n"))
 
-(init! default-registry)
-
 (comment
   ;; Create the registry with defaults
   (init!
@@ -419,19 +197,15 @@
 (comment
   ;; Create separate registry
   (def my-registry (init!
-                    {:name              "my-registry"
+                    {:self-managed?     true
                      :exclude-defaults? true
-                     :collectors        {:test_counter   {:type :counter :description "a counter" :label-names [:foo]}
-                                         :test_gauge     {:type :gauge :description "a gauge"}
-                                         :test_histogram {:type :histogram :description "a histogram"}}}))
+                     :collectors        {:test_counter {:type :counter :description "a counter" :label-names [:foo]}}}))
 
   ;; Add more metrics
   (register! :another_counter {:type :counter :description "another counter" :registry my-registry})
 
   ;; Observe some values
   (increase! :test_counter {:n 3 :labels {:foo "bar"} :registry my-registry})
-  (set-n! :test_gauge 2.1 {:registry my-registry})
-  (observe! :test_histogram 0.51 {:registry my-registry})
 
   (deref my-registry)
 
@@ -441,8 +215,7 @@
 
 (comment
   ;; Perf testing
-  (def reg (init! (atom nil)
-                  {:exclude-defaults? true
+  (def reg (init! {:exclude-defaults? true
                    :collectors        {:test_counter   {:type :counter :description "a counter" :label-names [:foo]}
                                        :test_gauge     {:type :gauge :description "a gauge"}
                                        :test_histogram {:type :histogram :description "a histogram"}}}))
@@ -451,10 +224,10 @@
   (def ops-per-thread 250000)
   (defn run [] (dotimes [x ops-per-thread]
                  (case (mod x 4)
-                   0 (increase! reg :test_counter {:n (inc (rand-int 5)) :labels {:foo "bar"}})
-                   1 (increase! reg :test_gauge {:n (inc (rand-int 5))})
-                   2 (set-n! reg :test_gauge (inc (rand-int 5)) {})
-                   3 (observe! reg :test_histogram (rand 2) {}))))
+                   0 (increase! :test_counter {:n (inc (rand-int 5)) :labels {:foo "bar"} :registry reg})
+                   1 (increase! :test_gauge {:n (inc (rand-int 5)) :registry reg})
+                   2 (set-n! :test_gauge (inc (rand-int 5)) {:registry reg})
+                   3 (observe! :test_histogram (rand 2) {:registry reg}))))
 
   (let [start (System/currentTimeMillis)]
     (dorun (apply pcalls (repeat thread-count run)))
@@ -464,49 +237,3 @@
       (println "TOOK: " total)
       (println (format "%2f ops per sec" (double (/ (* thread-count ops-per-thread 1000) total)))))))
 
-(comment
-  ;; Counter
-  (-> (counter :c {:description "test"})
-      (increase {:n 2})
-      (-collect))
-
-  (-> (counter :c {:description "test" :label-names [:foo]})
-      (increase {:labels {:foo "bar"}})
-      (increase {:labels {:foo "bob"}})
-      (-collect))
-
-  ;; Gauge
-  (-> (gauge :g {:description "test"})
-      (increase {:n 2})
-      (decrease {:n 0.5})
-      (-collect))
-
-  (-> (gauge :g {:description "test" :label-names [:foo]})
-      (increase {:n 2 :labels {:foo "bar"}})
-      (decrease {:n 0.5 :labels {:foo "bar"}})
-      (set-n 0.5 {:labels {:foo "baz"}})
-      (-collect))
-
-  ;; Summary
-  (-> (summary :s {:description "test"})
-      (observe 1 {})
-      (observe 2 {})
-      (-collect))
-
-  (-> (summary :s {:description "test" :label-names [:foo]})
-      (observe 1 {:labels {:foo "bar"}})
-      (observe 2 {:labels {:foo "baz"}})
-      (-collect))
-
-  ;; Histogram
-  (-> (histogram :h {:description "test"})
-      (observe 0.5 {})
-      (observe 0.01 {})
-      (observe 7 {})
-      (-collect))
-
-  (-> (histogram :h {:description "test" :label-names [:path]})
-      (observe 0.5 {:labels {:path "/foo"}})
-      (observe 0.01 {:labels {:path "/bar"}})
-      (observe 7 {:labels {:path "/foo"}})
-      (-collect)))
