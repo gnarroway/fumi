@@ -11,7 +11,7 @@ Features:
 - Exports built-in JVM/process metrics
 - Supports all prometheus metric types (counter, gauge, summary, histogram)
 - Supports central configuration as well as creating collectors next to the code they instrument.
-- Supports custom collectors implemented as a function (implementing a protocol)
+- Supports custom collectors implemented as functions (implementing a protocol)
 
 ## Status
 
@@ -75,7 +75,7 @@ to all subsequent operations.
 (increase! :test_counter {:n 3 :labels {:foo "bar"} :registry my-registry})
 
 ;; Output -- explicitly include default-registry if you want it
-(-> (collect my-registry fc/default-registry)
+(-> (collect my-registry default-registry)
     (serialize :text))
 ```
 
