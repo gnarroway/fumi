@@ -9,8 +9,9 @@ Features:
 
 - Pure Clojure with no dependencies
 - Exports built-in JVM/process metrics
-- Supports all prometheus types (counter, gauge, summary, histogram)
+- Supports all prometheus metric types (counter, gauge, summary, histogram)
 - Supports central configuration as well as creating collectors next to the code they instrument.
+- Supports custom collectors implemented as a function (implementing a protocol)
 
 ## Status
 
@@ -22,7 +23,7 @@ Please try it out and raise any issues you may find.
 For Leinengen, add this to your project.clj:
 
 ```clojure
-[fumi "0.1.0-alpha"]
+[fumi "0.1.0-beta1"]
 ```
 
 ## Getting started
