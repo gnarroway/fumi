@@ -33,7 +33,7 @@
 
 ;;; Implementation
 
-(defrecord Counter [name description label-names]
+(defrecord Counter [name help label-names]
   Increaseable
   (-increase [this n {:keys [labels]}]
     (update-in this [:labels labels]
@@ -43,14 +43,13 @@
   Collectable
   (-collect [this]
     {:name    name
-     :help    description
+     :help    help
      :type    :counter
-     :samples (map (fn [[k v]] (cond-> {:name  name
-                                        :value (:value v)}
+     :samples (map (fn [[k v]] (cond-> {:value (:value v)}
                                  (seq k) (assoc :labels k)))
                    (:labels this))}))
 
-(defrecord Gauge [name description label-names]
+(defrecord Gauge [name help label-names]
   Increaseable
   (-increase [this n {:keys [labels]}]
     (update-in this [:labels labels]
@@ -70,14 +69,13 @@
   Collectable
   (-collect [this]
     {:name    name
-     :help    description
+     :help    help
      :type    :gauge
-     :samples (map (fn [[k v]] (cond-> {:name  name
-                                        :value (:value v)}
+     :samples (map (fn [[k v]] (cond-> {:value (:value v)}
                                  (seq k) (assoc :labels k)))
                    (:labels this))}))
 
-(defrecord Summary [name description label-names]
+(defrecord Summary [name help label-names]
   Observable
   (-observe [this x {:keys [labels]}]
     (update-in this [:labels labels]
@@ -88,7 +86,7 @@
   Collectable
   (-collect [this]
     {:name    name
-     :help    description
+     :help    help
      :type    :summary
      :samples (for [[k v] (:labels this)
                     t [:count :sum]]
@@ -96,7 +94,7 @@
                          :value (t v)}
                   (seq k) (assoc :labels k)))}))
 
-(defrecord Histogram [name description label-names buckets]
+(defrecord Histogram [name help label-names buckets]
   Observable
   (-observe [this x {:keys [labels]}]
     (let [b (first (remove #(< % x) buckets))]
@@ -109,7 +107,7 @@
   Collectable
   (-collect [this]
     {:name    name
-     :help    description
+     :help    help
      :type    :histogram
      :samples (->> (:labels this)
                    (mapcat (fn [[k v]]
@@ -129,15 +127,15 @@
                    (apply concat))}))
 
 (defn- throw-if-invalid
-  [metric-name description label-names]
+  [metric-name help label-names]
   (assert (and (keyword? metric-name) (re-matches metric-name-re (name metric-name)))
-          (format "name must be a keyword matching /%s/" metric-name-re))
+          (format "name [%s] must be a keyword matching /%s/" metric-name metric-name-re))
 
   (doseq [label label-names]
     (assert (re-matches label-name-re (name label))
             (format "label [%s] does not match /%s/." label label-name-re)))
 
-  (assert (string? description) "description must be provided"))
+  (assert (string? help) "help must be provided"))
 
 (defn counter
   "Creates a counter collector.
@@ -145,11 +143,11 @@
   `name` a keyword compliant with prometheus naming.
   `options` a map of:
 
-  - `:description`
+  - `:help`
   - `:label-names` a list of strings or keywords"
-  [name {:keys [description label-names] :or {label-names []}}]
-  (throw-if-invalid name description label-names)
-  (cond-> (->Counter name description label-names)
+  [name {:keys [help label-names] :or {label-names []}}]
+  (throw-if-invalid name help label-names)
+  (cond-> (->Counter name help label-names)
     (empty? label-names) (assoc :labels {nil {:value 0}})))
 
 (defn gauge
@@ -158,11 +156,11 @@
   `name` a keyword compliant with prometheus naming.
   `options` a map of:
 
-  - `:description`
+  - `:help`
   - `:label-names` a list of strings or keywords"
-  [name {:keys [description label-names] :or {label-names []}}]
-  (throw-if-invalid name description label-names)
-  (cond-> (->Gauge name description label-names)
+  [name {:keys [help label-names] :or {label-names []}}]
+  (throw-if-invalid name help label-names)
+  (cond-> (->Gauge name help label-names)
     (empty? label-names) (assoc :labels {nil {:value 0}})))
 
 (defn summary
@@ -171,12 +169,12 @@
   `name` a keyword compliant with prometheus naming.
   `options` a map of:
 
-  - `:description`
+  - `:help`
   - `:label-names` a list of strings or keywords"
-  [name {:keys [description label-names] :or {label-names []}}]
+  [name {:keys [help label-names] :or {label-names []}}]
   {:pre [(not (.contains (map keyword label-names) :quantile))]}
-  (throw-if-invalid name description label-names)
-  (->Summary name description label-names))
+  (throw-if-invalid name help label-names)
+  (->Summary name help label-names))
 
 (defn histogram
   "Creates a histogram collector.
@@ -184,41 +182,36 @@
   `name` a keyword compliant with prometheus naming.
   `options` a map of:
 
-  - `:description`
+  - `:help`
   - `:label-names` a list of strings or keywords
   - `:buckets` a list of increasing bucket cutoffs. +Inf will be appended to the end.
     Defaults to [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]"
-  [name {:keys [description label-names buckets]
+  [name {:keys [help label-names buckets]
          :or   {label-names [] buckets [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]}}]
   {:pre [(not (.contains (map keyword label-names) :le))
          (seq buckets)
          (apply < buckets)]}
-  (throw-if-invalid name description label-names)
+  (throw-if-invalid name help label-names)
   (let [buckets (distinct (conj (vec buckets) (Double/POSITIVE_INFINITY)))]
-    (-> (->Histogram name description label-names buckets)
+    (-> (->Histogram name help label-names buckets)
         (assoc :bucket-values {}))))
-
-(defn- metric-collector
-  "Create a collector from some options."
-  [metric-name {:keys [type] :as opts}]
-  {:pre [(#{:counter :gauge :summary :histogram} type)]}
-  (case type
-    :counter (counter metric-name opts)
-    :gauge (gauge metric-name opts)
-    :summary (summary metric-name opts)
-    :histogram (histogram metric-name opts)))
 
 (defn ->collector
   "Coerces arguments into a Collectable.
 
-  `coll-name` is a keyworded name of a collector
+  `name` is a keyworded name of a collector
   `collector-or-opts` is a Collectable or a map of options to create a metric collector`"
-  [coll-name collector-or-opts]
-  {:pre [(keyword? coll-name)
-         (re-matches metric-name-re (name coll-name))]}
+  [name collector-or-opts]
+  (assert (and (keyword? name) (re-matches metric-name-re (clojure.core/name name)))
+          (format "name [%s] must be a keyword matching /%s/" name metric-name-re))
   (if (satisfies? Collectable collector-or-opts)
     collector-or-opts
-    (metric-collector coll-name collector-or-opts)))
+    (case (:type collector-or-opts)
+      :counter (counter name collector-or-opts)
+      :gauge (gauge name collector-or-opts)
+      :summary (summary name collector-or-opts)
+      :histogram (histogram name collector-or-opts)
+      :else (throw (IllegalArgumentException. "Unknown metric type")))))
 
 ;;; Operations
 
@@ -248,46 +241,46 @@
 
 (comment
   ;; Counter
-  (-> (counter :c {:description "test"})
+  (-> (counter :c {:help "test"})
       (increase {:n 2})
       (-collect))
 
-  (-> (counter :c {:description "test" :label-names [:foo]})
+  (-> (counter :c {:help "test" :label-names [:foo]})
       (increase {:labels {:foo "bar"}})
       (increase {:labels {:foo "bob"}})
       (-collect))
 
   ;; Gauge
-  (-> (gauge :g {:description "test"})
+  (-> (gauge :g {:help "test"})
       (increase {:n 2})
       (decrease {:n 0.5})
       (-collect))
 
-  (-> (gauge :g {:description "test" :label-names [:foo]})
+  (-> (gauge :g {:help "test" :label-names [:foo]})
       (increase {:n 2 :labels {:foo "bar"}})
       (decrease {:n 0.5 :labels {:foo "bar"}})
       (set-n 0.5 {:labels {:foo "baz"}})
       (-collect))
 
   ;; Summary
-  (-> (summary :s {:description "test"})
+  (-> (summary :s {:help "test"})
       (observe 1 {})
       (observe 2 {})
       (-collect))
 
-  (-> (summary :s {:description "test" :label-names [:foo]})
+  (-> (summary :s {:help "test" :label-names [:foo]})
       (observe 1 {:labels {:foo "bar"}})
       (observe 2 {:labels {:foo "baz"}})
       (-collect))
 
   ;; Histogram
-  (-> (histogram :h {:description "test"})
+  (-> (histogram :h {:help "test"})
       (observe 0.5 {})
       (observe 0.01 {})
       (observe 7 {})
       (-collect))
 
-  (-> (histogram :h {:description "test" :label-names [:path]})
+  (-> (histogram :h {:help "test" :label-names [:path]})
       (observe 0.5 {:labels {:path "/foo"}})
       (observe 0.01 {:labels {:path "/bar"}})
       (observe 7 {:labels {:path "/foo"}})

@@ -4,23 +4,23 @@
 
 (deftest test-counter
   (testing "without labels"
-    (let [c (counter :c {:description "test"})]
+    (let [c (counter :c {:help "test"})]
 
       (is (= {:help    "test"
               :name    :c
-              :samples [{:name :c :value 0}]
+              :samples [{:value 0}]
               :type    :counter}
              (-> c (-collect))) "default to 0")
 
       (is (= {:help    "test"
               :name    :c
-              :samples [{:name :c :value 1}]
+              :samples [{:value 1}]
               :type    :counter}
              (-> c (increase {}) (-collect))))
 
       (is (= {:help    "test"
               :name    :c
-              :samples [{:name :c :value 2.1}]
+              :samples [{:value 2.1}]
               :type    :counter}
              (-> c (increase {:n 2.1}) (-collect))))
 
@@ -28,7 +28,7 @@
       (is (thrown? Exception (decrease c {})) "counter cannot decrease")))
 
   (testing "with labels"
-    (let [c (counter :c {:description "test" :label-names [:foo]})]
+    (let [c (counter :c {:help "test" :label-names [:foo]})]
 
       (is (= {:help    "test"
               :name    :c
@@ -38,8 +38,8 @@
 
       (is (= {:help    "test"
               :name    :c
-              :samples [{:labels {:foo "bar"} :name :c :value 1}
-                        {:labels {:foo "bob"} :name :c :value 1.1}]
+              :samples [{:labels {:foo "bar"} :value 1}
+                        {:labels {:foo "bob"} :value 1.1}]
               :type    :counter}
              (-> c
                  (increase {:labels {:foo "bar"}})
@@ -52,35 +52,35 @@
 
 (deftest test-gauge
   (testing "without labels"
-    (let [g (gauge :g {:description "test"})]
+    (let [g (gauge :g {:help "test"})]
 
       (is (= {:help    "test"
               :name    :g
-              :samples [{:name :g :value 0}]
+              :samples [{:value 0}]
               :type    :gauge}
              (-> g (-collect))) "defaults to 0")
 
       (is (= {:help    "test"
               :name    :g
-              :samples [{:name :g :value 1}]
+              :samples [{:value 1}]
               :type    :gauge}
              (-> g (increase {}) (-collect))))
 
       (is (= {:help    "test"
               :name    :g
-              :samples [{:name :g :value -1}]
+              :samples [{:value -1}]
               :type    :gauge}
              (-> g (decrease {}) (-collect))))
 
       (is (= {:help    "test"
               :name    :g
-              :samples [{:name :g :value -1.0}]
+              :samples [{:value -1.0}]
               :type    :gauge}
              (-> g (increase {:n 2.1}) (decrease {:n 3.1}) (-collect))))
 
       (is (= {:help    "test"
               :name    :g
-              :samples [{:name :g :value 2.1}]
+              :samples [{:value 2.1}]
               :type    :gauge}
              (-> g (set-n 2.1 {}) (-collect))))
 
@@ -88,7 +88,7 @@
       (is (thrown? AssertionError (decrease g {:n 0})) "n must be positive")))
 
   (testing "with labels"
-    (let [g (gauge :g {:description "test" :label-names [:foo]})]
+    (let [g (gauge :g {:help "test" :label-names [:foo]})]
 
       (is (= {:help    "test"
               :name    :g
@@ -98,8 +98,8 @@
 
       (is (= {:help    "test"
               :name    :g
-              :samples [{:labels {:foo "bar"} :name :g :value 1}
-                        {:labels {:foo "bob"} :name :g :value 1.1}]
+              :samples [{:labels {:foo "bar"} :value 1}
+                        {:labels {:foo "bob"} :value 1.1}]
               :type    :gauge}
              (-> g
                  (increase {:labels {:foo "bar"}})
@@ -109,8 +109,8 @@
 
       (is (= {:help    "test"
               :name    :g
-              :samples [{:labels {:foo "bar"} :name :g :value 1}
-                        {:labels {:foo "bob"} :name :g :value -0.9}]
+              :samples [{:labels {:foo "bar"} :value 1}
+                        {:labels {:foo "bob"} :value -0.9}]
               :type    :gauge}
              (-> g
                  (increase {:labels {:foo "bar"}})
@@ -123,7 +123,7 @@
 
 (deftest test-summary
   (testing "without labels"
-    (let [s (summary :s {:description "test"})]
+    (let [s (summary :s {:help "test"})]
       (is (= {:help    "test"
               :name    :s
               :samples []
@@ -141,7 +141,7 @@
                  (-collect))))))
 
   (testing "with labels"
-    (let [s (summary :s {:description "test" :label-names [:foo]})]
+    (let [s (summary :s {:help "test" :label-names [:foo]})]
       (is (= {:help    "test"
               :name    :s
               :samples []
@@ -166,7 +166,7 @@
 
 (deftest test-histogram
   (testing "without labels"
-    (let [h (histogram :h {:description "test"})]
+    (let [h (histogram :h {:help "test"})]
       (is (= {:help    "test"
               :name    :h
               :samples []
@@ -200,7 +200,7 @@
                  (-collect))))))
 
   (testing "with labels"
-    (let [h (histogram :h {:description "test" :label-names [:path]})]
+    (let [h (histogram :h {:help "test" :label-names [:path]})]
       (is (= {:help    "test"
               :name    :h
               :samples []

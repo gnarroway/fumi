@@ -13,7 +13,6 @@
   {:jvm_family     (jvm/collector)
    :process_family (process/collector)})
 
-
 ;;; Registry
 
 
@@ -36,7 +35,7 @@
   - `:exclude-defaults?` (optional) exclude default collectors when set to true (default false).
   - `:collectors` a map of collector name to either a `Collectable`, or an options map with keys:
     - `:type` :counter, :gauge, :histogram, :summary.
-    - `:description` a string describing the metric.
+    - `:help` a string describing the metric.
     - `:label-names` (optional) a list of string/keyword dimensions of this metric.
     - `:buckets` (optional, only for histogram), defaulting to `[0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]`."
   [config]
@@ -52,7 +51,7 @@
   - `name` is the name of the metric.
   - `opts` is a map of:
     - `:type` :counter, :gauge, :histogram, :summary.
-    - `:description` a string describing the metric.
+    - `:help` a string describing the metric.
     - `:label-names` (optional) a list of string/keyword dimensions of this metric.
     - `:buckets` (optional, only for histogram), defaulting to `[0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]`.
     - `:registry` (optional) the result of calling init!. If not specified, uses the default-registry."
@@ -66,8 +65,7 @@
 
 (defn- throw-if-not-registered
   [r name]
-  (when-not (contains? r name)
-    (throw (IllegalArgumentException. (format "%s has not been registered." name)))))
+  (assert (contains? r name) (format "%s has not been registered." name)))
 
 (defn increase!
   "Increase the value of a collector `name`.
@@ -137,7 +135,7 @@
   "Collects stats from one or more registries into a list of metrics.
   Default registry is always included."
   ([] (collect default-registry))
-  ([registry & registries] (->> (conj registries registry default-registry)
+  ([registry & registries] (->> (conj registries registry)
                                 (distinct)
                                 (map deref)
                                 (apply merge)
@@ -175,13 +173,13 @@
   ;; Create the registry with defaults
   (init!
    {:exclude-defaults? false
-    :collectors        {:test_counter   {:type :counter :description "a counter" :label-names [:foo]}
-                        :test_gauge     {:type :gauge :description "a gauge"}
-                        :test_histogram {:type :histogram :description "a histogram"}}})
+    :collectors        {:test_counter   {:type :counter :help "a counter" :label-names [:foo]}
+                        :test_gauge     {:type :gauge :help "a gauge"}
+                        :test_histogram {:type :histogram :help "a histogram"}}})
 
   ;; Add more metrics
-  (register! :another_counter {:type :counter :description "another counter"})
-  (register! :test_summary {:type :summary :description "a summary"})
+  (register! :another_counter {:type :counter :help "another counter"})
+  (register! :test_summary {:type :summary :help "a summary"})
 
   ;; Observe some values
   (increase! :test_counter {:n 3 :labels {:foo "bar"}})
@@ -199,10 +197,10 @@
   (def my-registry (init!
                     {:self-managed?     true
                      :exclude-defaults? true
-                     :collectors        {:test_counter {:type :counter :description "a counter" :label-names [:foo]}}}))
+                     :collectors        {:test_counter {:type :counter :help "a counter" :label-names [:foo]}}}))
 
   ;; Add more metrics
-  (register! :another_counter {:type :counter :description "another counter" :registry my-registry})
+  (register! :another_counter {:type :counter :help "another counter" :registry my-registry})
 
   ;; Observe some values
   (increase! :test_counter {:n 3 :labels {:foo "bar"} :registry my-registry})
@@ -216,9 +214,9 @@
 (comment
   ;; Perf testing
   (def reg (init! {:exclude-defaults? true
-                   :collectors        {:test_counter   {:type :counter :description "a counter" :label-names [:foo]}
-                                       :test_gauge     {:type :gauge :description "a gauge"}
-                                       :test_histogram {:type :histogram :description "a histogram"}}}))
+                   :collectors        {:test_counter   {:type :counter :help "a counter" :label-names [:foo]}
+                                       :test_gauge     {:type :gauge :help "a gauge"}
+                                       :test_histogram {:type :histogram :help "a histogram"}}}))
 
   (def thread-count 4)
   (def ops-per-thread 250000)
