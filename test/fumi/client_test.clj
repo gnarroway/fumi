@@ -45,11 +45,11 @@
 (deftest ^:integration test-counter
   (fc/init! {:exclude-defaults? true
              :collectors        {:c {:type :counter, :help "ch"}}})
-  (is (= [{:help "ch" :name :c :samples [{:value 0}] :type :counter}]
+  (is (= [{:help "ch" :name :c :samples [{:value 0.0}] :type :counter}]
          (fc/collect)))
 
   (fc/increase! :c)
-  (is (= [{:help "ch" :name :c :samples [{:value 1}] :type :counter}]
+  (is (= [{:help "ch" :name :c :samples [{:value 1.0}] :type :counter}]
          (fc/collect)))
 
   (fc/increase! :c {:n 1.1})
@@ -58,7 +58,7 @@
 
   (fc/register! :c2 {:type :counter :help "ch2"})
   (is (= [{:help "ch" :name :c :samples [{:value 2.1}] :type :counter}
-          {:help "ch2" :name :c2 :samples [{:value 0}] :type :counter}]
+          {:help "ch2" :name :c2 :samples [{:value 0.0}] :type :counter}]
          (fc/collect)))
 
   (is (= (str "# HELP c ch\n"
@@ -67,7 +67,7 @@
               "\n"
               "# HELP c2 ch2\n"
               "# HELP c2 counter\n"
-              "c2 0\n")
+              "c2 0.0\n")
          (-> (fc/collect) (fc/serialize :text)))))
 
 (deftest ^:integration test-counter-with-labels
@@ -81,7 +81,7 @@
   (is (= [{:help    "cd"
            :name    :c
            :samples [{:labels {:bar "bar" :foo "foo"}
-                      :value  1}
+                      :value  1.0}
                      {:labels {:bar "baz" :foo "foo"}
                       :value  1.1}]
            :type    :counter}]
@@ -89,18 +89,18 @@
 
   (is (= (str "# HELP c cd\n"
               "# HELP c counter\n"
-              "c{foo=\"foo\",bar=\"bar\"} 1\n"
+              "c{foo=\"foo\",bar=\"bar\"} 1.0\n"
               "c{foo=\"foo\",bar=\"baz\"} 1.1\n")
          (-> (fc/collect) (fc/serialize :text)))))
 
 (deftest ^:integration test-gauge
   (fc/init! {:exclude-defaults? true
              :collectors        {:g {:type :gauge, :help "gh"}}})
-  (is (= [{:help "gh" :name :g :samples [{:value 0}] :type :gauge}]
+  (is (= [{:help "gh" :name :g :samples [{:value 0.0}] :type :gauge}]
          (fc/collect)))
 
   (fc/increase! :g)
-  (is (= [{:help "gh" :name :g :samples [{:value 1}] :type :gauge}]
+  (is (= [{:help "gh" :name :g :samples [{:value 1.0}] :type :gauge}]
          (fc/collect)))
 
   (fc/decrease! :g {:n 0.1})
@@ -113,7 +113,7 @@
 
   (fc/register! :g2 {:type :gauge :help "gh2"})
   (is (= [{:help "gh" :name :g :samples [{:value 2.0}] :type :gauge}
-          {:help "gh2" :name :g2 :samples [{:value 0}] :type :gauge}]
+          {:help "gh2" :name :g2 :samples [{:value 0.0}] :type :gauge}]
          (fc/collect)))
 
   (is (= (str "# HELP g gh\n"
@@ -122,7 +122,7 @@
               "\n"
               "# HELP g2 gh2\n"
               "# HELP g2 gauge\n"
-              "g2 0\n")
+              "g2 0.0\n")
          (-> (fc/collect) (fc/serialize :text)))))
 
 (deftest ^:integration test-gauge-with-labels
@@ -137,19 +137,19 @@
   (is (= [{:help    "gd"
            :name    :g
            :samples [{:labels {:bar "bar" :foo "foo"}
-                      :value  1}
+                      :value  1.0}
                      {:labels {:bar "baz" :foo "foo"}
                       :value  1.1}
                      {:labels {:bar "bam" :foo "foo"}
-                      :value  2}]
+                      :value  2.0}]
            :type    :gauge}]
          (fc/collect)))
 
   (is (= (str "# HELP g gd\n"
               "# HELP g gauge\n"
-              "g{foo=\"foo\",bar=\"bar\"} 1\n"
+              "g{foo=\"foo\",bar=\"bar\"} 1.0\n"
               "g{foo=\"foo\",bar=\"baz\"} 1.1\n"
-              "g{foo=\"foo\",bar=\"bam\"} 2\n")
+              "g{foo=\"foo\",bar=\"bam\"} 2.0\n")
          (-> (fc/collect) (fc/serialize :text)))))
 
 (deftest ^:integration test-summary

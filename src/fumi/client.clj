@@ -81,7 +81,9 @@
   ([name opts]
    (let [r (or (:registry opts) default-registry)]
      (throw-if-not-registered @r name)
-     (swap! r update name metric/increase opts))))
+     (when-not (empty? (:labels opts))
+       (swap! r update name metric/prepare opts))
+     (metric/increase (get @r name) opts))))
 
 (defn decrease!
   "Decrease the value of collector `name`.
@@ -97,7 +99,9 @@
   ([name opts]
    (let [r (or (:registry opts) default-registry)]
      (throw-if-not-registered @r name)
-     (swap! r update name metric/decrease opts))))
+     (when-not (empty? (:labels opts))
+       (swap! r update name metric/prepare opts))
+     (metric/decrease (get @r name) opts))))
 
 (defn set-n!
   "Sets the value of a collector `name` to `n`.
@@ -113,7 +117,9 @@
   ([name n opts]
    (let [r (or (:registry opts) default-registry)]
      (throw-if-not-registered @r name)
-     (swap! r update name metric/set-n n opts))))
+     (when-not (empty? (:labels opts))
+       (swap! r update name metric/prepare opts))
+     (metric/set-n (get @r name) n opts))))
 
 (defn observe!
   "Observe value `n` for collector `name`.

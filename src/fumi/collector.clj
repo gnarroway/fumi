@@ -1,6 +1,10 @@
 (ns ^{:author "George Narroway"}
  fumi.collector
-  "Prometheus core metric implementations")
+  "Prometheus core metric implementations"
+  (:import (java.util.concurrent.atomic DoubleAdder)
+           (java.util List)))
+
+(set! *warn-on-reflection* true)
 
 (def metric-name-re #"[a-zA-Z_:][a-zA-Z0-9_:]*")
 (def label-name-re #"[a-zA-Z_][a-zA-Z0-9_]*")
@@ -31,48 +35,100 @@
 (defprotocol Observable
   (-observe [this n opts] "Observes value `n`, optionally for a map `opts.labels`"))
 
+(defprotocol Preparable
+  (-prepare [this opts] "Performs initialization prior to use. Takes `opts.labels`"))
+
 ;;; Implementation
 
-(defrecord Counter [name help label-names]
+(defrecord SingleCounter [name help ^DoubleAdder adder]
   Increaseable
-  (-increase [this n {:keys [labels]}]
-    (update-in this [:labels labels]
-               (fn [{:keys [value] :or {value 0}}]
-                 {:value (+ value n)})))
+  (-increase [this n _]
+    (.add adder n)
+    this)
+
+  Collectable
+  (-collect [_]
+    {:name    name
+     :help    help
+     :type    :counter
+     :samples [{:value (.sum adder)}]}))
+
+(defrecord MultiCounter [name help label-names]
+  Preparable
+  (-prepare [this {:keys [labels]}]
+    (if (get-in this [:labels labels])
+      this
+      (assoc-in this [:labels labels] (DoubleAdder.))))
+
+  Increaseable
+  (-increase [this n opts]
+    (.add ^DoubleAdder (get-in this [:labels (:labels opts)]) n)
+    this)
 
   Collectable
   (-collect [this]
     {:name    name
      :help    help
      :type    :counter
-     :samples (map (fn [[k v]] (cond-> {:value (:value v)}
-                                 (seq k) (assoc :labels k)))
+     :samples (map (fn [[k ^DoubleAdder v]] {:value  (.sum v)
+                                             :labels k})
                    (:labels this))}))
 
-(defrecord Gauge [name help label-names]
+(defrecord SingleGauge [name help ^DoubleAdder adder]
   Increaseable
-  (-increase [this n {:keys [labels]}]
-    (update-in this [:labels labels]
-               (fn [{:keys [value] :or {value 0}}]
-                 {:value (+ value n)})))
+  (-increase [this n _]
+    (.add adder n)
+    this)
 
   Decreaseable
-  (-decrease [this n {:keys [labels]}]
-    (update-in this [:labels labels]
-               (fn [{:keys [value] :or {value 0}}]
-                 {:value (- value n)})))
+  (-decrease [this n _]
+    (.add adder (* -1 n))
+    this)
 
   Setable
-  (-set [this n {:keys [labels]}]
-    (assoc-in this [:labels labels :value] n))
+  (-set [this n _]
+    (.reset adder)
+    (.add adder n)
+    this)
+
+  Collectable
+  (-collect [_]
+    {:name    name
+     :help    help
+     :type    :gauge
+     :samples [{:value (.sum adder)}]}))
+
+(defrecord MultiGauge [name help label-names]
+  Preparable
+  (-prepare [this {:keys [labels]}]
+    (if (get-in this [:labels labels])
+      this
+      (assoc-in this [:labels labels] (DoubleAdder.))))
+
+  Increaseable
+  (-increase [this n opts]
+    (.add ^DoubleAdder (get-in this [:labels (:labels opts)]) n)
+    this)
+
+  Decreaseable
+  (-decrease [this n opts]
+    (.add ^DoubleAdder (get-in this [:labels (:labels opts)] n) (* -1 n))
+    this)
+
+  Setable
+  (-set [this n opts]
+    (doto ^DoubleAdder (get-in this [:labels (:labels opts)])
+      (.reset)
+      (.add n))
+    this)
 
   Collectable
   (-collect [this]
     {:name    name
      :help    help
      :type    :gauge
-     :samples (map (fn [[k v]] (cond-> {:value (:value v)}
-                                 (seq k) (assoc :labels k)))
+     :samples (map (fn [[k ^DoubleAdder v]] {:value  (.sum v)
+                                             :labels k})
                    (:labels this))}))
 
 (defrecord Summary [name help label-names]
@@ -147,8 +203,9 @@
   - `:label-names` a list of strings or keywords"
   [name {:keys [help label-names] :or {label-names []}}]
   (throw-if-invalid name help label-names)
-  (cond-> (->Counter name help label-names)
-    (empty? label-names) (assoc :labels {nil {:value 0}})))
+  (if (empty? label-names)
+    (->SingleCounter name help (DoubleAdder.))
+    (->MultiCounter name help label-names)))
 
 (defn gauge
   "Creates a gauge collector.
@@ -160,8 +217,9 @@
   - `:label-names` a list of strings or keywords"
   [name {:keys [help label-names] :or {label-names []}}]
   (throw-if-invalid name help label-names)
-  (cond-> (->Gauge name help label-names)
-    (empty? label-names) (assoc :labels {nil {:value 0}})))
+  (if (empty? label-names)
+    (->SingleGauge name help (DoubleAdder.))
+    (->MultiGauge name help label-names)))
 
 (defn summary
   "Creates a summary collector.
@@ -172,7 +230,7 @@
   - `:help`
   - `:label-names` a list of strings or keywords"
   [name {:keys [help label-names] :or {label-names []}}]
-  {:pre [(not (.contains (map keyword label-names) :quantile))]}
+  {:pre [(not (.contains ^List (map keyword label-names) :quantile))]}
   (throw-if-invalid name help label-names)
   (->Summary name help label-names))
 
@@ -188,7 +246,7 @@
     Defaults to [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]"
   [name {:keys [help label-names buckets]
          :or   {label-names [] buckets [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]}}]
-  {:pre [(not (.contains (map keyword label-names) :le))
+  {:pre [(not (.contains ^List (map keyword label-names) :le))
          (seq buckets)
          (apply < buckets)]}
   (throw-if-invalid name help label-names)
@@ -233,6 +291,13 @@
          (= (set (:label-names c)) (set (keys labels)))]}
   (-set c n opts))
 
+(defn prepare
+  [c {:keys [labels] :as opts}]
+  {:pre [(= (set (:label-names c)) (set (keys labels)))]}
+  (if (satisfies? Preparable c)
+    (-prepare c opts)
+    c))
+
 (defn observe
   [c n {:keys [labels] :as opts}]
   {:pre [(number? n)
@@ -246,7 +311,9 @@
       (-collect))
 
   (-> (counter :c {:help "test" :label-names [:foo]})
+      (prepare {:labels {:foo "bar"}})
       (increase {:labels {:foo "bar"}})
+      (prepare {:labels {:foo "bob"}})
       (increase {:labels {:foo "bob"}})
       (-collect))
 

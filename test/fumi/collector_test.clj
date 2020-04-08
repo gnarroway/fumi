@@ -4,46 +4,49 @@
 
 (deftest test-counter
   (testing "without labels"
-    (let [c (counter :c {:help "test"})]
+    (let [c #(counter :c {:help "test"})]
 
       (is (= {:help    "test"
               :name    :c
-              :samples [{:value 0}]
+              :samples [{:value 0.0}]
               :type    :counter}
-             (-> c (-collect))) "default to 0")
+             (-> (c) (-collect))) "default to 0")
 
       (is (= {:help    "test"
               :name    :c
-              :samples [{:value 1}]
+              :samples [{:value 1.0}]
               :type    :counter}
-             (-> c (increase {}) (-collect))))
+             (-> (c) (increase {}) (-collect))))
 
       (is (= {:help    "test"
               :name    :c
               :samples [{:value 2.1}]
               :type    :counter}
-             (-> c (increase {:n 2.1}) (-collect))))
+             (-> (c) (increase {:n 2.1}) (-collect))))
 
       (is (thrown? AssertionError (increase c {:n 0})) "n must be positive")
       (is (thrown? Exception (decrease c {})) "counter cannot decrease")))
 
   (testing "with labels"
-    (let [c (counter :c {:help "test" :label-names [:foo]})]
+    (let [c #(counter :c {:help "test" :label-names [:foo]})]
 
       (is (= {:help    "test"
               :name    :c
               :samples []
               :type    :counter}
-             (-> c (-collect))))
+             (-> (c) (-collect))))
 
       (is (= {:help    "test"
               :name    :c
-              :samples [{:labels {:foo "bar"} :value 1}
+              :samples [{:labels {:foo "bar"} :value 1.0}
                         {:labels {:foo "bob"} :value 1.1}]
               :type    :counter}
-             (-> c
+             (-> (c)
+                 (-prepare {:labels {:foo "bar"}})
                  (increase {:labels {:foo "bar"}})
+                 (-prepare {:labels {:foo "bob"}})
                  (increase {:labels {:foo "bob"}})
+                 (-prepare {:labels {:foo "bob"}})
                  (increase {:labels {:foo "bob"} :n 0.1})
                  (-collect))))
 
@@ -52,69 +55,75 @@
 
 (deftest test-gauge
   (testing "without labels"
-    (let [g (gauge :g {:help "test"})]
+    (let [g #(gauge :g {:help "test"})]
 
       (is (= {:help    "test"
               :name    :g
-              :samples [{:value 0}]
+              :samples [{:value 0.0}]
               :type    :gauge}
-             (-> g (-collect))) "defaults to 0")
+             (-> (g) (-collect))) "defaults to 0")
 
       (is (= {:help    "test"
               :name    :g
-              :samples [{:value 1}]
+              :samples [{:value 1.0}]
               :type    :gauge}
-             (-> g (increase {}) (-collect))))
-
-      (is (= {:help    "test"
-              :name    :g
-              :samples [{:value -1}]
-              :type    :gauge}
-             (-> g (decrease {}) (-collect))))
+             (-> (g) (increase {}) (-collect))))
 
       (is (= {:help    "test"
               :name    :g
               :samples [{:value -1.0}]
               :type    :gauge}
-             (-> g (increase {:n 2.1}) (decrease {:n 3.1}) (-collect))))
+             (-> (g) (decrease {}) (-collect))))
+
+      (is (= {:help    "test"
+              :name    :g
+              :samples [{:value -1.0}]
+              :type    :gauge}
+             (-> (g) (increase {:n 2.1}) (decrease {:n 3.1}) (-collect))))
 
       (is (= {:help    "test"
               :name    :g
               :samples [{:value 2.1}]
               :type    :gauge}
-             (-> g (set-n 2.1 {}) (-collect))))
+             (-> (g) (set-n 2.1 {}) (-collect))))
 
       (is (thrown? AssertionError (increase g {:n 0})) "n must be positive")
       (is (thrown? AssertionError (decrease g {:n 0})) "n must be positive")))
 
   (testing "with labels"
-    (let [g (gauge :g {:help "test" :label-names [:foo]})]
+    (let [g #(gauge :g {:help "test" :label-names [:foo]})]
 
       (is (= {:help    "test"
               :name    :g
               :samples []
               :type    :gauge}
-             (-> g (-collect))))
+             (-> (g) (-collect))))
 
       (is (= {:help    "test"
               :name    :g
-              :samples [{:labels {:foo "bar"} :value 1}
+              :samples [{:labels {:foo "bar"} :value 1.0}
                         {:labels {:foo "bob"} :value 1.1}]
               :type    :gauge}
-             (-> g
+             (-> (g)
+                 (-prepare {:labels {:foo "bar"}})
                  (increase {:labels {:foo "bar"}})
+                 (-prepare {:labels {:foo "bob"}})
                  (increase {:labels {:foo "bob"}})
+                 (-prepare {:labels {:foo "bob"}})
                  (increase {:labels {:foo "bob"} :n 0.1})
                  (-collect))))
 
       (is (= {:help    "test"
               :name    :g
-              :samples [{:labels {:foo "bar"} :value 1}
+              :samples [{:labels {:foo "bar"} :value 1.0}
                         {:labels {:foo "bob"} :value -0.9}]
               :type    :gauge}
-             (-> g
+             (-> (g)
+                 (-prepare {:labels {:foo "bar"}})
                  (increase {:labels {:foo "bar"}})
+                 (-prepare {:labels {:foo "bob"}})
                  (decrease {:labels {:foo "bob"}})
+                 (-prepare {:labels {:foo "bob"}})
                  (increase {:labels {:foo "bob"} :n 0.1})
                  (-collect))))
 
