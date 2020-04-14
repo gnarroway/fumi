@@ -179,19 +179,17 @@
       (is (= {:help    "test"
               :name    :s
               :samples [{:labels {:foo "bar"} :name "s_count" :value 1}
-                        {:labels {:foo "bar"} :name "s_sum" :value 1.0}] #_[{:labels {:foo "bar"} :name "s_count" :value 1}
-                                                                            {:labels {:foo "bar"} :name "s_sum" :value 1.0}
-                        ;{:labels {:foo "baz"} :name "s_count" :value 2}
-                        ;{:labels {:foo "baz"} :name "s_sum" :value 2.1}]
-                                                                            ]
+                        {:labels {:foo "bar"} :name "s_sum" :value 1.0}
+                        {:labels {:foo "baz"} :name "s_count" :value 2}
+                        {:labels {:foo "baz"} :name "s_sum" :value 2.1}]
               :type    :summary}
              (-> (s)
                  (prepare {:labels {:foo "bar"}})
                  (observe 1 {:labels {:foo "bar"}})
-                 ;(prepare {:labels {:foo "baz"}})
-                 ;(observe 2 {:labels {:foo "baz"}})
-                 ;(prepare {:labels {:foo "baz"}})
-                 ;(observe 0.1 {:labels {:foo "baz"}})
+                 (prepare {:labels {:foo "baz"}})
+                 (observe 2 {:labels {:foo "baz"}})
+                 (prepare {:labels {:foo "baz"}})
+                 (observe 0.1 {:labels {:foo "baz"}})
                  (-collect))))
 
       (is (thrown? AssertionError (observe (s) 1 {})) "labels must be provided for all label-names")
@@ -199,12 +197,28 @@
 
 (deftest test-histogram
   (testing "without labels"
-    (let [h (histogram :h {:help "test"})]
+    (let [h #(histogram :h {:help "test"})]
       (is (= {:help    "test"
               :name    :h
-              :samples []
+              :samples [{:labels {:le "0.005"} :name   "h_buckets" :value  0}
+                        {:labels {:le "0.01"} :name   "h_buckets" :value  0}
+                        {:labels {:le "0.025"} :name   "h_buckets" :value  0}
+                        {:labels {:le "0.05"} :name   "h_buckets" :value  0}
+                        {:labels {:le "0.075"} :name   "h_buckets" :value  0}
+                        {:labels {:le "0.1"} :name   "h_buckets" :value  0}
+                        {:labels {:le "0.25"} :name   "h_buckets" :value  0}
+                        {:labels {:le "0.5"} :name   "h_buckets" :value  0}
+                        {:labels {:le "0.75"} :name   "h_buckets" :value  0}
+                        {:labels {:le "1"} :name   "h_buckets" :value  0}
+                        {:labels {:le "2.5"} :name   "h_buckets" :value  0}
+                        {:labels {:le "5"} :name   "h_buckets" :value  0}
+                        {:labels {:le "7.5"} :name   "h_buckets" :value  0}
+                        {:labels {:le "10"} :name   "h_buckets" :value  0}
+                        {:labels {:le "+Inf"} :name   "h_buckets" :value  0}
+                        {:name  "h_count" :value 0}
+                        {:name  "h_sum" :value 0.0}]
               :type    :histogram}
-             (-collect h)))
+             (-collect (h))))
 
       (is (= {:help    "test"
               :name    :h
@@ -226,19 +240,19 @@
                         {:name "h_count" :value 3}
                         {:name "h_sum" :value 7.51}]
               :type    :histogram}
-             (-> h
+             (-> (h)
                  (observe 0.5 {})
                  (observe 0.01 {})
                  (observe 7 {})
                  (-collect))))))
 
   (testing "with labels"
-    (let [h (histogram :h {:help "test" :label-names [:path]})]
+    (let [h #(histogram :h {:help "test" :label-names [:path]})]
       (is (= {:help    "test"
               :name    :h
               :samples []
               :type    :histogram}
-             (-collect h)))
+             (-collect (h))))
 
       (is (= {:help    "test"
               :name    :h
@@ -277,11 +291,14 @@
                         {:labels {:path "/bar"} :name "h_count" :value 1}
                         {:labels {:path "/bar"} :name "h_sum" :value 0.01}]
               :type    :histogram}
-             (-> h
+             (-> (h)
+                 (prepare {:labels {:path "/foo"}})
                  (observe 0.5 {:labels {:path "/foo"}})
+                 (prepare {:labels {:path "/bar"}})
                  (observe 0.01 {:labels {:path "/bar"}})
+                 (prepare {:labels {:path "/foo"}})
                  (observe 7 {:labels {:path "/foo"}})
                  (-collect))))
 
-      (is (thrown? AssertionError (observe h 1 {})) "labels must be provided for all label-names")
-      (is (thrown? AssertionError (observe h 1 {:labels {:foo "bar" :a "b"}})) "labels must be provided for only label-names"))))
+      (is (thrown? AssertionError (observe (h) 1 {})) "labels must be provided for all label-names")
+      (is (thrown? AssertionError (observe (h) 1 {:labels {:foo "bar" :a "b"}})) "labels must be provided for only label-names"))))

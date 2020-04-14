@@ -171,23 +171,59 @@
      :help    help
      :type    :summary
      :samples (mapcat (fn [[k v]]
-                        [{:name  (str (clojure.core/name name) "_count")
+                        [{:name   (str (clojure.core/name name) "_count")
                           :labels k
-                          :value (.sum ^LongAdder (:count v))}
-                         {:name  (str (clojure.core/name name) "_sum")
+                          :value  (.sum ^LongAdder (:count v))}
+                         {:name   (str (clojure.core/name name) "_sum")
                           :labels k
-                          :value (.sum ^DoubleAdder (:sum v))}])
+                          :value  (.sum ^DoubleAdder (:sum v))}])
                       (:labels this))}))
 
-(defrecord Histogram [name help label-names buckets]
+(defrecord SingleHistogram [name help cnt sum buckets]
   Observable
-  (-observe [this x {:keys [labels]}]
-    (let [b (first (remove #(< % x) buckets))]
-      (update-in this [:labels labels]
-                 (fn [v] (-> v
-                             (update-in [:bucket-values b] (fnil inc 0))
-                             (update :sum (fnil + 0) x)
-                             (update :count (fnil inc 0)))))))
+  (-observe [this n _]
+    (.add ^LongAdder (:value (first (remove #(< (:le %) n) buckets))) 1)
+    (.add ^LongAdder cnt 1)
+    (.add ^DoubleAdder sum n)
+    this)
+
+  Collectable
+  (-collect [_]
+    {:name    name
+     :help    help
+     :type    :histogram
+     :samples (concat (let [cumulative-buckets (reduce (fn [acc x]
+                                                         (assoc acc (:le x) (+ (.sum ^LongAdder (:value x))
+                                                                               (apply max (or (vals acc) [0])))))
+                                                       {} buckets)]
+                        (map (fn [{:keys [le]}]
+                               {:name   (str (clojure.core/name name) "_buckets")
+                                :labels (assoc nil :le (if (= (Double/POSITIVE_INFINITY) le) "+Inf" (str le)))
+                                :value  (cumulative-buckets le)})
+                             buckets))
+
+                      [{:name  (str (clojure.core/name name) "_count")
+                        :value (.sum ^LongAdder cnt)}
+                       {:name  (str (clojure.core/name name) "_sum")
+                        :value (.sum ^DoubleAdder sum)}])}))
+
+(defrecord MultiHistogram [name help label-names bucket-cutoffs]
+  Preparable
+  (-prepare [this {:keys [labels]}]
+    (if (get-in this [:labels labels])
+      this
+      (assoc-in this [:labels labels]
+                {:buckets (map (fn [b] {:le b :value (LongAdder.)}) bucket-cutoffs)
+                 :count   (LongAdder.)
+                 :sum     (DoubleAdder.)})))
+
+  Observable
+  (-observe [this n opts]
+    (let [h (get-in this [:labels (:labels opts)])]
+      (.add ^LongAdder (:value (first (remove #(< (:le %) n) (:buckets h)))) 1)
+      (.add ^LongAdder (:count h) 1)
+      (.add ^DoubleAdder (:sum h) n))
+    this)
 
   Collectable
   (-collect [this]
@@ -195,20 +231,24 @@
      :help    help
      :type    :histogram
      :samples (->> (:labels this)
-                   (mapcat (fn [[k v]]
-                             [(let [cumulative-buckets (reduce (fn [acc x]
-                                                                 (assoc acc x (+ (or (get-in v [:bucket-values x]) 0)
-                                                                                 (apply max (or (vals acc) [0]))))) {}
-                                                               buckets)]
-                                (map (fn [b] {:name   (str (clojure.core/name name) "_buckets")
-                                              :labels (assoc k :le (if (= (Double/POSITIVE_INFINITY) b) "+Inf" (str b)))
-                                              :value  (cumulative-buckets b)})
-                                     buckets))
+                   (map (fn [[k v]]
+                          (concat
+                           (let [label-buckets (:buckets v)
+                                 cumulative-buckets (reduce (fn [acc x]
+                                                              (assoc acc (:le x) (+ (.sum ^LongAdder (:value x))
+                                                                                    (apply max (or (vals acc) [0])))))
+                                                            {} label-buckets)]
 
-                              (map (fn [t]
-                                     (cond-> {:name  (str (clojure.core/name name) "_" (clojure.core/name t))
-                                              :value (t v)}
-                                       (seq k) (assoc :labels k))) [:count :sum])]))
+                             (map (fn [{:keys [le]}] {:name   (str (clojure.core/name name) "_buckets")
+                                                      :labels (assoc k :le (if (= (Double/POSITIVE_INFINITY) le) "+Inf" (str le)))
+                                                      :value  (cumulative-buckets le)})
+                                  label-buckets))
+                           [{:name   (str (clojure.core/name name) "_count")
+                             :value  (.sum ^LongAdder (:count v))
+                             :labels k}
+                            {:name   (str (clojure.core/name name) "_sum")
+                             :value  (.sum ^DoubleAdder (:sum v))
+                             :labels k}])))
                    (apply concat))}))
 
 (defn- throw-if-invalid
@@ -282,8 +322,9 @@
          (apply < buckets)]}
   (throw-if-invalid name help label-names)
   (let [buckets (distinct (conj (vec buckets) (Double/POSITIVE_INFINITY)))]
-    (-> (->Histogram name help label-names buckets)
-        (assoc :bucket-values {}))))
+    (if (empty? label-names)
+      (->SingleHistogram name help (LongAdder.) (DoubleAdder.) (map (fn [b] {:le b :value (LongAdder.)}) buckets))
+      (->MultiHistogram name help label-names buckets))))
 
 (defn ->collector
   "Coerces arguments into a Collectable.
