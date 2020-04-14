@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## [Unreleased]
+### Changed
+- More efficient implementations of Summary/Histogram
+
 ## [0.2.0-b1] 2020-04-08
 ### Changed
 - Swapped implementation of counter/gauge for up to 10x faster DoubleAdder
