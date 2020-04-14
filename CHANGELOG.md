@@ -1,7 +1,7 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
-## [Unreleased]
+## [0.2.0-b2] 2020-04-14
 ### Changed
 - More efficient implementations of Summary/Histogram
 
@@ -13,5 +13,6 @@ All notable changes to this project will be documented in this file. This change
 ### Added
 - Initial release
 
-[Unreleased]: https://github.com/gnarroway/hato/compare/v0.2.0-b1...HEAD
+[Unreleased]: https://github.com/gnarroway/hato/compare/v0.2.0-b2...HEAD
+[0.2.0-b2]: https://github.com/gnarroway/hato/compare/v0.2.0-b1...v0.2.0-b2
 [0.2.0-b1]: https://github.com/gnarroway/hato/compare/v0.1.0-beta1...v0.1.0-b1
