@@ -155,7 +155,13 @@
 (deftest ^:integration test-summary
   (fc/init! {:exclude-defaults? true
              :collectors        {:s {:type :summary, :help "sd"}}})
-  (is (= [{:help "sd" :name :s :samples [] :type :summary}]
+  (is (= [{:help    "sd"
+           :name    :s
+           :samples [{:name  "s_count"
+                      :value 0}
+                     {:name  "s_sum"
+                      :value 0.0}]
+           :type    :summary}]
          (fc/collect)))
 
   (fc/observe! :s 1.0)
@@ -182,7 +188,10 @@
            :type    :summary}
           {:help    "sd2"
            :name    :s2
-           :samples []
+           :samples [{:name  "s2_count"
+                      :value 0}
+                     {:name  "s2_sum"
+                      :value 0.0}]
            :type    :summary}]
          (fc/collect)))
 
@@ -192,7 +201,9 @@
               "s_sum 1.1\n"
               "\n"
               "# HELP s2 sd2\n"
-              "# HELP s2 summary\n")
+              "# HELP s2 summary\n"
+              "s2_count 0\n"
+              "s2_sum 0.0\n")
          (-> (fc/collect) (fc/serialize :text)))))
 
 (deftest ^:integration test-summary-with-labels

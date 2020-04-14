@@ -1,10 +1,11 @@
 (ns ^{:author "George Narroway"}
  fumi.collector
   "Prometheus core metric implementations"
-  (:import (java.util.concurrent.atomic DoubleAdder)
+  (:import (java.util.concurrent.atomic DoubleAdder LongAdder)
            (java.util List)))
 
 (set! *warn-on-reflection* true)
+;(set! *unchecked-math* :warn-on-boxed)
 
 (def metric-name-re #"[a-zA-Z_:][a-zA-Z0-9_:]*")
 (def label-name-re #"[a-zA-Z_][a-zA-Z0-9_]*")
@@ -82,7 +83,7 @@
 
   Decreaseable
   (-decrease [this n _]
-    (.add adder (* -1 n))
+    (.add adder (- ^double n))
     this)
 
   Setable
@@ -112,7 +113,7 @@
 
   Decreaseable
   (-decrease [this n opts]
-    (.add ^DoubleAdder (get-in this [:labels (:labels opts)] n) (* -1 n))
+    (.add ^DoubleAdder (get-in this [:labels (:labels opts)] n) (- ^double n))
     this)
 
   Setable
@@ -131,24 +132,52 @@
                                              :labels k})
                    (:labels this))}))
 
-(defrecord Summary [name help label-names]
+(defrecord SingleSummary [name help ^LongAdder cnt ^DoubleAdder sum]
   Observable
-  (-observe [this x {:keys [labels]}]
-    (update-in this [:labels labels]
-               (fn [v] (-> v
-                           (update :sum (fnil + 0) x)
-                           (update :count (fnil inc 0))))))
+  (-observe [this n _]
+    (.add cnt 1)
+    (.add sum n)
+    this)
+
+  Collectable
+  (-collect [_]
+    {:name    name
+     :help    help
+     :type    :summary
+     :samples [{:name  (str (clojure.core/name name) "_count")
+                :value (.sum cnt)}
+               {:name  (str (clojure.core/name name) "_sum")
+                :value (.sum sum)}]}))
+
+(defrecord MultiSummary [name help label-names]
+  Preparable
+  (-prepare [this {:keys [labels]}]
+    (if (get-in this [:labels labels])
+      this
+      (assoc-in this [:labels labels]
+                {:count (LongAdder.)
+                 :sum   (DoubleAdder.)})))
+
+  Observable
+  (-observe [this n opts]
+    (let [s (get-in this [:labels (:labels opts)])]
+      (.add ^LongAdder (:count s) 1)
+      (.add ^DoubleAdder (:sum s) n))
+    this)
 
   Collectable
   (-collect [this]
     {:name    name
      :help    help
      :type    :summary
-     :samples (for [[k v] (:labels this)
-                    t [:count :sum]]
-                (cond-> {:name  (str (clojure.core/name name) "_" (clojure.core/name t))
-                         :value (t v)}
-                  (seq k) (assoc :labels k)))}))
+     :samples (mapcat (fn [[k v]]
+                        [{:name  (str (clojure.core/name name) "_count")
+                          :labels k
+                          :value (.sum ^LongAdder (:count v))}
+                         {:name  (str (clojure.core/name name) "_sum")
+                          :labels k
+                          :value (.sum ^DoubleAdder (:sum v))}])
+                      (:labels this))}))
 
 (defrecord Histogram [name help label-names buckets]
   Observable
@@ -232,7 +261,9 @@
   [name {:keys [help label-names] :or {label-names []}}]
   {:pre [(not (.contains ^List (map keyword label-names) :quantile))]}
   (throw-if-invalid name help label-names)
-  (->Summary name help label-names))
+  (if (empty? label-names)
+    (->SingleSummary name help (LongAdder.) (DoubleAdder.))
+    (->MultiSummary name help label-names)))
 
 (defn histogram
   "Creates a histogram collector.
@@ -336,7 +367,9 @@
       (-collect))
 
   (-> (summary :s {:help "test" :label-names [:foo]})
+      (prepare {:labels {:foo "bar"}})
       (observe 1 {:labels {:foo "bar"}})
+      (prepare {:labels {:foo "baz"}})
       (observe 2 {:labels {:foo "baz"}})
       (-collect))
 

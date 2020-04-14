@@ -24,8 +24,8 @@
               :type    :counter}
              (-> (c) (increase {:n 2.1}) (-collect))))
 
-      (is (thrown? AssertionError (increase c {:n 0})) "n must be positive")
-      (is (thrown? Exception (decrease c {})) "counter cannot decrease")))
+      (is (thrown? AssertionError (increase (c) {:n 0})) "n must be positive")
+      (is (thrown? Exception (decrease (c) {})) "counter cannot decrease")))
 
   (testing "with labels"
     (let [c #(counter :c {:help "test" :label-names [:foo]})]
@@ -50,8 +50,8 @@
                  (increase {:labels {:foo "bob"} :n 0.1})
                  (-collect))))
 
-      (is (thrown? AssertionError (increase c {:n 0})) "labels must be provided for all label-names")
-      (is (thrown? AssertionError (increase c {:n 0 :labels {:foo "bar" :a "b"}})) "labels must be provided for only label-names"))))
+      (is (thrown? AssertionError (increase (c) {:n 0})) "labels must be provided for all label-names")
+      (is (thrown? AssertionError (increase (c) {:n 0 :labels {:foo "bar" :a "b"}})) "labels must be provided for only label-names"))))
 
 (deftest test-gauge
   (testing "without labels"
@@ -87,8 +87,8 @@
               :type    :gauge}
              (-> (g) (set-n 2.1 {}) (-collect))))
 
-      (is (thrown? AssertionError (increase g {:n 0})) "n must be positive")
-      (is (thrown? AssertionError (decrease g {:n 0})) "n must be positive")))
+      (is (thrown? AssertionError (increase (g) {:n 0})) "n must be positive")
+      (is (thrown? AssertionError (decrease (g) {:n 0})) "n must be positive")))
 
   (testing "with labels"
     (let [g #(gauge :g {:help "test" :label-names [:foo]})]
@@ -127,51 +127,75 @@
                  (increase {:labels {:foo "bob"} :n 0.1})
                  (-collect))))
 
-      (is (thrown? AssertionError (increase g {:n 0})) "labels must be provided for all label-names")
-      (is (thrown? AssertionError (increase g {:n 0 :labels {:foo "bar" :a "b"}})) "labels must be provided for only label-names"))))
+      (is (thrown? AssertionError (increase (g) {:n 0})) "labels must be provided for all label-names")
+      (is (thrown? AssertionError (increase (g) {:n 0 :labels {:foo "bar" :a "b"}})) "labels must be provided for only label-names"))))
 
 (deftest test-summary
   (testing "without labels"
-    (let [s (summary :s {:help "test"})]
+    (let [s #(summary :s {:help "test"})]
       (is (= {:help    "test"
               :name    :s
-              :samples []
+              :samples [{:name  "s_count"
+                         :value 0}
+                        {:name  "s_sum"
+                         :value 0.0}]
               :type    :summary}
-             (-collect s)))
+             (-collect (s))))
 
       (is (= {:help    "test"
               :name    :s
               :samples [{:name "s_count" :value 2}
-                        {:name "s_sum" :value 3}]
+                        {:name "s_sum" :value 3.1}]
               :type    :summary}
-             (-> s
+             (-> (s)
                  (observe 1 {})
-                 (observe 2 {})
+                 (observe 2.1 {})
                  (-collect))))))
 
   (testing "with labels"
-    (let [s (summary :s {:help "test" :label-names [:foo]})]
+    (let [s #(summary :s {:help "test" :label-names [:foo]})]
       (is (= {:help    "test"
               :name    :s
               :samples []
               :type    :summary}
-             (-collect s)))
+             (-collect (s))))
 
       (is (= {:help    "test"
               :name    :s
               :samples [{:labels {:foo "bar"} :name "s_count" :value 1}
-                        {:labels {:foo "bar"} :name "s_sum" :value 1}
+                        {:labels {:foo "bar"} :name "s_sum" :value 1.0}
                         {:labels {:foo "baz"} :name "s_count" :value 2}
                         {:labels {:foo "baz"} :name "s_sum" :value 2.1}]
               :type    :summary}
-             (-> s
+             (-> (s)
+                 (prepare {:labels {:foo "bar"}})
                  (observe 1 {:labels {:foo "bar"}})
+                 (prepare {:labels {:foo "baz"}})
                  (observe 2 {:labels {:foo "baz"}})
+                 (prepare {:labels {:foo "baz"}})
                  (observe 0.1 {:labels {:foo "baz"}})
                  (-collect))))
 
-      (is (thrown? AssertionError (observe s 1 {})) "labels must be provided for all label-names")
-      (is (thrown? AssertionError (observe s 1 {:labels {:foo "bar" :a "b"}})) "labels must be provided for only label-names"))))
+      (is (= {:help    "test"
+              :name    :s
+              :samples [{:labels {:foo "bar"} :name "s_count" :value 1}
+                        {:labels {:foo "bar"} :name "s_sum" :value 1.0}] #_[{:labels {:foo "bar"} :name "s_count" :value 1}
+                                                                            {:labels {:foo "bar"} :name "s_sum" :value 1.0}
+                        ;{:labels {:foo "baz"} :name "s_count" :value 2}
+                        ;{:labels {:foo "baz"} :name "s_sum" :value 2.1}]
+                                                                            ]
+              :type    :summary}
+             (-> (s)
+                 (prepare {:labels {:foo "bar"}})
+                 (observe 1 {:labels {:foo "bar"}})
+                 ;(prepare {:labels {:foo "baz"}})
+                 ;(observe 2 {:labels {:foo "baz"}})
+                 ;(prepare {:labels {:foo "baz"}})
+                 ;(observe 0.1 {:labels {:foo "baz"}})
+                 (-collect))))
+
+      (is (thrown? AssertionError (observe (s) 1 {})) "labels must be provided for all label-names")
+      (is (thrown? AssertionError (observe (s) 1 {:labels {:foo "bar" :a "b"}})) "labels must be provided for only label-names"))))
 
 (deftest test-histogram
   (testing "without labels"

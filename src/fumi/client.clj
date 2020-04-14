@@ -135,7 +135,14 @@
   ([name n opts]
    (let [r (or (:registry opts) default-registry)]
      (throw-if-not-registered @r name)
-     (swap! r update name metric/observe n opts))))
+
+     (if (instance? fumi.collector.Histogram (get @r name))
+       (swap! r update name metric/observe n opts)
+       (do
+         (when-not (empty? (:labels opts))
+           (swap! r update name metric/prepare opts))
+
+         (metric/observe (get @r name) n opts))))))
 
 (defn collect
   "Collects stats from one or more registries into a list of metrics.
