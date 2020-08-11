@@ -63,7 +63,7 @@
                        nil))
                    (from-val))}
 
-     {:name    :process_open_fds
+     {:name    :process_max_fds
       :type    :gauge
       :help    "Maximum number of open file descriptors."
       :samples (-> (try
