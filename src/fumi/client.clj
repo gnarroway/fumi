@@ -4,8 +4,7 @@
   (:require [clojure.string :as string]
             [fumi.collector.jvm :as jvm]
             [fumi.collector.process :as process]
-            [fumi.collector :as collector]
-            [fumi.collector :as metric]))
+            [fumi.collector :as collector]))
 
 (defonce default-registry (atom nil))
 
@@ -22,7 +21,7 @@
   Returns a map of collectors."
   [config]
   (cond-> (reduce (fn [acc [name opts]]
-                    (assoc acc name (metric/->collector name opts))) {} (:collectors config))
+                    (assoc acc name (collector/->collector name opts))) {} (:collectors config))
 
     (not (:exclude-defaults? config)) (merge default-config)))
 
@@ -57,7 +56,7 @@
     - `:registry` (optional) the result of calling init!. If not specified, uses the default-registry."
   [name opts]
   (let [registry (or (:registry opts) default-registry)]
-    (swap! registry assoc name (metric/->collector name opts))))
+    (swap! registry assoc name (collector/->collector name opts))))
 
 (init! default-registry)
 
@@ -82,8 +81,8 @@
    (let [r (or (:registry opts) default-registry)]
      (throw-if-not-registered @r name)
      (when-not (empty? (:labels opts))
-       (swap! r update name metric/prepare opts))
-     (metric/increase (get @r name) opts))))
+       (swap! r update name collector/prepare opts))
+     (collector/increase (get @r name) opts))))
 
 (defn decrease!
   "Decrease the value of collector `name`.
@@ -100,8 +99,8 @@
    (let [r (or (:registry opts) default-registry)]
      (throw-if-not-registered @r name)
      (when-not (empty? (:labels opts))
-       (swap! r update name metric/prepare opts))
-     (metric/decrease (get @r name) opts))))
+       (swap! r update name collector/prepare opts))
+     (collector/decrease (get @r name) opts))))
 
 (defn set-n!
   "Sets the value of a collector `name` to `n`.
@@ -118,8 +117,8 @@
    (let [r (or (:registry opts) default-registry)]
      (throw-if-not-registered @r name)
      (when-not (empty? (:labels opts))
-       (swap! r update name metric/prepare opts))
-     (metric/set-n (get @r name) n opts))))
+       (swap! r update name collector/prepare opts))
+     (collector/set-n (get @r name) n opts))))
 
 (defn observe!
   "Observe value `n` for collector `name`.
@@ -135,15 +134,15 @@
   ([name n opts]
    (let [r (or (:registry opts) default-registry)]
      (throw-if-not-registered @r name)
-
      (when-not (empty? (:labels opts))
-       (swap! r update name metric/prepare opts))
-
-     (metric/observe (get @r name) n opts))))
+       (swap! r update name collector/prepare opts))
+     (collector/observe (get @r name) n opts))))
 
 (defn collect
   "Collects stats from one or more registries into a list of metrics.
-  Default registry is always included."
+
+  Uses the default registry if no arguments are provided.
+  Otherwise, all desired registries (including the default) must be explicitly provided."
   ([] (collect default-registry))
   ([registry & registries] (->> (conj registries registry)
                                 (distinct)

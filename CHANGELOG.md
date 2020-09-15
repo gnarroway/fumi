@@ -1,6 +1,10 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
+## [0.2.0-b3] 2020-08-11
+### Fixed
+- Correct naming of process_max_fds (#1)
+
 ## [0.2.0-b2] 2020-04-14
 ### Changed
 - More efficient implementations of Summary/Histogram
