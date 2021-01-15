@@ -15,7 +15,7 @@ Features:
 
 ## Status
 
-fumi is under active develpment and may experience breaking changes. 
+fumi is under active development and may experience breaking changes. 
 Please try it out and raise any issues you may find.
 
 ## Usage
@@ -23,7 +23,7 @@ Please try it out and raise any issues you may find.
 For Leinengen, add this to your project.clj:
 
 ```clojure
-[fumi "0.2.0-b3"]
+[fumi "0.2.0-b4"]
 ```
 
 ## Getting started

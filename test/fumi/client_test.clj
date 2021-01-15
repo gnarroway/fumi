@@ -62,11 +62,11 @@
          (fc/collect)))
 
   (is (= (str "# HELP c ch\n"
-              "# HELP c counter\n"
+              "# TYPE c counter\n"
               "c 2.1\n"
               "\n"
               "# HELP c2 ch2\n"
-              "# HELP c2 counter\n"
+              "# TYPE c2 counter\n"
               "c2 0.0\n")
          (-> (fc/collect) (fc/serialize :text)))))
 
@@ -88,7 +88,7 @@
          (fc/collect)))
 
   (is (= (str "# HELP c cd\n"
-              "# HELP c counter\n"
+              "# TYPE c counter\n"
               "c{foo=\"foo\",bar=\"bar\"} 1.0\n"
               "c{foo=\"foo\",bar=\"baz\"} 1.1\n")
          (-> (fc/collect) (fc/serialize :text)))))
@@ -117,11 +117,11 @@
          (fc/collect)))
 
   (is (= (str "# HELP g gh\n"
-              "# HELP g gauge\n"
+              "# TYPE g gauge\n"
               "g 2.0\n"
               "\n"
               "# HELP g2 gh2\n"
-              "# HELP g2 gauge\n"
+              "# TYPE g2 gauge\n"
               "g2 0.0\n")
          (-> (fc/collect) (fc/serialize :text)))))
 
@@ -146,7 +146,7 @@
          (fc/collect)))
 
   (is (= (str "# HELP g gd\n"
-              "# HELP g gauge\n"
+              "# TYPE g gauge\n"
               "g{foo=\"foo\",bar=\"bar\"} 1.0\n"
               "g{foo=\"foo\",bar=\"baz\"} 1.1\n"
               "g{foo=\"foo\",bar=\"bam\"} 2.0\n")
@@ -196,12 +196,12 @@
          (fc/collect)))
 
   (is (= (str "# HELP s sd\n"
-              "# HELP s summary\n"
+              "# TYPE s summary\n"
               "s_count 2\n"
               "s_sum 1.1\n"
               "\n"
               "# HELP s2 sd2\n"
-              "# HELP s2 summary\n"
+              "# TYPE s2 summary\n"
               "s2_count 0\n"
               "s2_sum 0.0\n")
          (-> (fc/collect) (fc/serialize :text)))))
@@ -232,7 +232,7 @@
          (fc/collect)))
 
   (is (= (str "# HELP s sd\n"
-              "# HELP s summary\n"
+              "# TYPE s summary\n"
               "s_count{foo=\"foo\",bar=\"bar\"} 1\n"
               "s_sum{foo=\"foo\",bar=\"bar\"} 1.0\n"
               "s_count{foo=\"foo\",bar=\"baz\"} 1\n"
@@ -354,7 +354,7 @@
          (fc/collect)))
 
   (is (= (str "# HELP h hd\n"
-              "# HELP h histogram\n"
+              "# TYPE h histogram\n"
               "h_buckets{le=\"0.005\"} 0\n"
               "h_buckets{le=\"0.01\"} 0\n"
               "h_buckets{le=\"0.025\"} 0\n"
@@ -374,7 +374,7 @@
               "h_sum 1.1\n"
               "\n"
               "# HELP h2 hd2\n"
-              "# HELP h2 histogram\n"
+              "# TYPE h2 histogram\n"
               "h2_buckets{le=\"0.005\"} 0\n"
               "h2_buckets{le=\"0.01\"} 0\n"
               "h2_buckets{le=\"0.025\"} 0\n"
@@ -442,7 +442,7 @@
          (fc/collect)))
 
   (is (= (str "# HELP h hd\n"
-              "# HELP h histogram\n"
+              "# TYPE h histogram\n"
               "h_buckets{foo=\"foo\",bar=\"bar\",le=\"0.005\"} 0\n"
               "h_buckets{foo=\"foo\",bar=\"bar\",le=\"0.01\"} 0\n"
               "h_buckets{foo=\"foo\",bar=\"bar\",le=\"0.025\"} 0\n"

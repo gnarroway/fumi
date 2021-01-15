@@ -172,7 +172,7 @@
   [metrics _]
   (str (->> metrics
             (map #(string/join "\n" (concat [(format "# HELP %s %s" (name (:name %)) (:help %))
-                                             (format "# HELP %s %s" (name (:name %)) (name (:type %)))]
+                                             (format "# TYPE %s %s" (name (:name %)) (name (:type %)))]
 
                                             (map (partial metric-row (:name %)) (:samples %)))))
             (string/join "\n\n"))
