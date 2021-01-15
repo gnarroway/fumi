@@ -169,7 +169,7 @@ the data in text format:
 
 ; Returns lines of text like:
 ; # HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
-; # HELP process_cpu_seconds_total counter
+; # TYPE process_cpu_seconds_total counter
 ; process_cpu_seconds_total 18.976212
 ```
 
