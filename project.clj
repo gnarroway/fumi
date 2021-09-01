@@ -11,4 +11,5 @@
   :dependencies [[io.prometheus/simpleclient "0.12.0"]]
   :plugins [[lein-cljfmt "0.6.6"]]
 
-  :profiles {:dev {:dependencies [[org.clojure/clojure "1.10.1"]]}})
+  :profiles {:dev {:dependencies [[org.clojure/clojure "1.10.1"]
+                                  [io.prometheus/simpleclient_hotspot "0.12.0"]]}})
