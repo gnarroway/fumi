@@ -1,1 +1,3 @@
-{:paths ["src"]}
+{:paths   ["src"]
+
+ :aliases {:dev {:extra-deps {io.prometheus/simpleclient {:mvn/version "0.12.0"}}}}}
