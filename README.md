@@ -7,11 +7,11 @@ A Prometheus client for Clojure.
 
 Features:
 
-- Pure Clojure with no dependencies
-- Exports built-in JVM/process metrics
+- Simple wrapper of the official [java client](https://github.com/prometheus/client_java)
 - Supports all prometheus metric types (counter, gauge, summary, histogram)
+- Built in exporters for JVM / process metrics (additional dep required)
 - Supports central configuration as well as creating collectors next to the code they instrument.
-- Supports custom collectors implemented as functions (implementing a protocol)
+- Supports custom collectors implemented as functions
 
 ## Status
 
@@ -32,7 +32,7 @@ For Leinengen, add this to your project.clj:
 ;; A default registry is already defined and exports jvm and process metrics. 
 ;; Use init! to redefine it, if you want to centralise configuration.
 (init!
-  {:exclude-defaults? false
+  {:default-exports?  true
    :collectors        {:test_counter   {:type :counter :help "a counter" :label-names [:foo]}
                        :test_gauge     {:type :gauge :help "a gauge"}
                        :test_histogram {:type :histogram :help "a histogram"}}})
@@ -52,12 +52,17 @@ For Leinengen, add this to your project.clj:
     (serialize :text))
 ```
 
-See the section on using self managed registries for other usage patterns.
+See the section on using self-managed registries for other usage patterns.
 
 ## Using other registries
 
-Typically using the default registry is sufficient, and handles hundreds of thousands of updates per second.
-fumi also allows you to use separate registries or hold onto references (e.g. to inject via component-style systems).
+Typically using the default registry is sufficient.
+fumi also allows you to use separate registries or hold onto references. This may be useful for:
+
+- injecting via component-style systems
+- for using with push gateway
+- test isolation
+
 In this case, the registry (i.e. result of calling `init!`) must be passed in as the `:registry` option
 to all subsequent operations.
 
@@ -65,7 +70,7 @@ to all subsequent operations.
 ;; Create your registry by using the :self-managed? argument and holding on to the result
 (def my-registry 
   (init! {:self-managed?     true
-          :exclude-defaults? true
+          :default-exports?  false
           :collectors        {:test_counter {:type :counter :help "a counter" :label-names [:foo]}}}))
 
 ;; Add more metrics to it
@@ -131,30 +136,58 @@ a `:labels` map with an entry for every label name.
 
 ## Built-in collectors
 
-By default, fumi comes with collectors that expose several useful metrics:
+By default, fumi can expose [default collectors](https://github.com/prometheus/client_java#included-collectors) 
+that expose several useful metrics:
 
 - JVM: memory, threads, garbage collection, jvm info
 - process: cpu, memory, file descriptors
 
-To exclude them, `init!` the registry with `:exclude-defaults?` set to true
+To enable them, ensure you have the extra dependency:
+
+```clojure
+io.prometheus/simpleclient_hotspot {:mvn/version "0.12.0"}
+```
+
+`init!` the registry with `:default-exports?` set to true to add all of them.
+
+To include them selectively, choose the relevant ones from those
+[available](https://github.com/prometheus/client_java/blob/master/simpleclient_hotspot/src/main/java/io/prometheus/client/hotspot/DefaultExports.java#L37),
+and provide them during `init!` or `register!`:
+
+```clojure
+; Add all default exports
+(init! {:default-exports? true})
+
+; Add only specific default exporters during init
+(init! {:collectors {:version-info (io.prometheus.client.hotspot.VersionInfoExports.)}})
+
+; Or to an existing registry
+(register! :version-info (io.prometheus.client.hotspot.VersionInfoExports.))
+```
+
 
 ## Custom collectors
 
 On top of creating the standard metric collectors and performing operations on them based on some event,
-it is possible to directly implement `Collectable`, providing a function that returns the necessary data,
-either as a single map, or a collection of them. 
+it is possible to directly implement `Collector` abstract class, providing a function that returns the necessary data
+as collection of metrics. You can directly pass in a function to `register!` or `init!` in place of an options map: 
 
 ```clojure
 ; Add a collector that a counter that is always stuck on 42.
-(fc/register! :constant_counter 
-              (reify fumi.collector/Collectable
-                     (-collect [_] {:help    "help"
-                                    :name    :constant_counter
-                                    :samples [{:value 42}]
-                                    :type    :counter})))
+(register! :constant_counter
+           (fn [] [{:name    "metric"
+                    :type    :counter
+                    :help    "a constant counter"
+                    :samples [{:value 42}]}
+                   {:name    "metric_with_labels",
+                    :type    :gauge,
+                    :help    "a constant gauge with labels",
+                    :samples [{:name   "active_requests",
+                               :value  42
+                               :labels {:source "foo"}}]}]))
 ```
 
-See the jvm/process collectors for further examples.
+You can also call `proxy-collector` with the same function to return a (not yet registered) `Collector` directly.
 
 ## Generating output
 
