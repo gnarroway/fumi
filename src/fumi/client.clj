@@ -1,5 +1,5 @@
 (ns ^{:author "George Narroway"}
-  fumi.client
+ fumi.client
   "Native clojure prometheus client"
   (:require [clojure.core :as core]
             [clojure.string :as string])
@@ -48,7 +48,7 @@
 (defn proxy-collector
   "Turns a function return clojure datastructures into a Collector.
 
-  The function should return a list of maps with fields:
+  The function should return a map (or list of maps) with fields:
 
   - `:name` the name of the metric or family
   - `:type` :counter, :gauge, :histogram, :summary. :info
@@ -67,10 +67,12 @@
                :labels {\"version\" \"11.0.11+9-LTS\"}}]}]"
   [f]
   (proxy
-    [Collector] []
+   [Collector] []
     (collect [& args]
-      (->> (f)
-           (map ->MetricFamilySamples)))))
+      (let [res (f)]
+        (if (map? res)
+          (->MetricFamilySamples res)
+          (map ->MetricFamilySamples res))))))
 
 (defn ->Collector
   [name opts]
@@ -86,16 +88,17 @@
               (.help (:help opts)))]
 
     (cond-> b
-            (:label-names opts) (.labelNames (into-array String (map core/name (:label-names opts))))
-            (and (= :histogram (:type opts))
-                 (:buckets opts)) (.buckets (into-array Double (map double (:buckets opts))))
-            true (.create))))
+      (:label-names opts) (.labelNames (into-array String (map core/name (:label-names opts))))
+      (and (= :histogram (:type opts))
+           (:buckets opts)) (.buckets (into-array Double (map double (:buckets opts))))
+      true (.create))))
 
 (defn register!
   "Register a collector and returns a wrapped version of the collector with its options.
 
   Arguments:
 
+  - `registry` a CollectorRegistry. if not provided, the default-registry will be used.
   - `name` is the name of the metric.
   - `opts` is a custom Collector, a function returning samples, or map of:
     - `:type` :counter, :gauge, :histogram, :summary.
@@ -103,17 +106,20 @@
     - `:label-names` (optional) a list of string/keyword dimensions of this metric.
     - `:buckets` (optional, only for histogram), defaulting to `[0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]`.
     - `:registry` (optional) the result of calling init!. If not specified, uses the default-registry."
-  [name opts]
-  (let [registry (or (:registry opts) default-registry)
-        c (cond
-            (map? opts) (->Collector name opts)
-            (fn? opts) (proxy-collector opts)
-            (instance? Collector opts) opts)]
-    (.register registry c)
-    (let [c' {:label-names (:label-names opts)
-              :collector   c}]
-      (swap! collectors assoc name c')
-      c')))
+  ([name opts]
+   (register! default-registry name opts))
+  ([registry name opts]
+   (let [registry (or registry default-registry)
+         c (cond
+             (map? opts) (->Collector name opts)
+             (fn? opts) (proxy-collector opts)
+             (instance? Collector opts) opts)]
+     (.register registry c)
+     (let [c' {:label-names (:label-names opts)
+               :registry    registry
+               :collector   c}]
+       (swap! collectors assoc name c')
+       c'))))
 
 (defn init!
   "Initialises a registry with config and returns the registry.
@@ -131,9 +137,9 @@
   (let [registry (if (:self-managed? config) (CollectorRegistry.) default-registry)]
     ; Clean up because the java client does not allow modification
     (.clear registry)
-    (reset! collectors nil)
+    (swap! collectors (fn [xs] (->> xs (remove (fn [[_ v]] (= registry (:registry v)))) (into {}))))
     (doseq [[name opts] (:collectors config)]
-      (register! name (if (map? opts) (assoc opts :registry registry) opts)))
+      (register! registry name opts))
     (when (:default-exports? config)
       (register-default-exports registry))
     registry))
@@ -229,8 +235,8 @@
                       :samples (->> (.samples m)
                                     (map (fn [s] (cond-> {:name  (.name s)
                                                           :value (.value s)}
-                                                         (some? (.timestampMs s)) (assoc :ts (.timestampMs s))
-                                                         (seq (.labelNames s)) (assoc :labels (zipmap (.labelNames s) (.labelValues s))))))
+                                                   (some? (.timestampMs s)) (assoc :ts (.timestampMs s))
+                                                   (seq (.labelNames s)) (assoc :labels (zipmap (.labelNames s) (.labelValues s))))))
                                     (sort-by (juxt :name :value)))}))
         (sort-by :name))))
 
@@ -246,8 +252,8 @@
     (format "%s%s %s" (core/name (or name parent-name)) label-str value)))
 
 (defmulti serialize
-          "Serialize collected metrics to output format."
-          (fn [_ type] type))
+  "Serialize collected metrics to output format."
+  (fn [_ type] type))
 
 (defmethod serialize :default
   [metrics _]
@@ -258,7 +264,6 @@
                                             (map (partial metric-row (:name %)) (:samples %)))))
             (string/join "\n\n"))
        "\n"))
-
 
 (comment
   ; Use collectors directly
@@ -302,7 +307,6 @@
   ; Include all default exports
   (init! {:default-exports? true})
 
-
   (defn collector
     []
     [{:name    "metric",
@@ -323,14 +327,13 @@
 
   (register! :foo (proxy-collector collector)))
 
-
 (comment
   ;; Create the registry with defaults
   (init!
-    {:default-exports? true
-     :collectors       {:test_counter   {:type :counter :help "a counter" :label-names [:foo]}
-                        :test_gauge     {:type :gauge :help "a gauge"}
-                        :test_histogram {:type :histogram :help "a histogram"}}})
+   {:default-exports? true
+    :collectors       {:test_counter   {:type :counter :help "a counter" :label-names [:foo]}
+                       :test_gauge     {:type :gauge :help "a gauge"}
+                       :test_histogram {:type :histogram :help "a histogram"}}})
 
   ;; Add more metrics
   (register! :another_counter {:type :counter :help "another counter"})
@@ -340,7 +343,6 @@
   (increase! :test_counter {:n 3 :labels {:foo "bar"}})
   (increase! :test_counter {:n -1 :labels {:foo "bar" :moo "cow"}})
   (increase! :test_counter {:labels {:foo :bar}})
-
 
   (set-n! :test_gauge 2.1 {})
   (observe! :test_histogram 0.51 {})
@@ -352,9 +354,9 @@
 (comment
   ;; Create separate registry
   (def my-registry (init!
-                     {:self-managed?    true
-                      :default-exports? false
-                      :collectors       {:test_counter {:type :counter :help "a counter" :label-names [:foo]}}}))
+                    {:self-managed?    true
+                     :default-exports? false
+                     :collectors       {:test_counter {:type :counter :help "a counter" :label-names [:foo]}}}))
 
   ;; Add more metrics
   (register! :another_counter {:type :counter :help "another counter" :registry my-registry})

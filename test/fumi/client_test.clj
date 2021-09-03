@@ -29,7 +29,16 @@
     (let [r (fc/init! {:default-exports? true})
           names (->> (fc/collect r) (map #(-> % :name name)))]
       (is (true? (some #(clojure.string/starts-with? % "jvm_") names)) "includes jvm metrics if default exports are enabled")
-      (is (true? (some #(clojure.string/starts-with? % "process_") names)) "includes process metrics if default exports are enabled"))))
+      (is (true? (some #(clojure.string/starts-with? % "process_") names)) "includes process metrics if default exports are enabled")))
+
+  (testing "multiple registries"
+    (let [r1 (fc/init! {:self-managed? true
+                        :collectors    {:c1 {:type :counter, :help "c1"}}})
+          r2 (fc/init! {:self-managed? true
+                        :collectors    {:c2 {:type :counter, :help "c2"}}})]
+      (fc/increase! :c1 {:registry r1})
+      (fc/increase! :c2 {:registry r2 :n 2})
+      (is (= #{"c1" "c2"} (set (map :name (fc/collect r1 r2)))) "first registry works even after initing a second"))))
 
 (deftest test-custom-collector
   (let [r (fc/init! {:collectors {:c (fn [] [{:help    "sample adds _total suffix"
@@ -61,7 +70,6 @@
                         :value  42.0}]
              :type    :counter}]
            (fc/collect r)) "java client adjusts suffixes for openmetrics compatibility")))
-
 
 (defn- without-created-sample
   "Removes auto-added samples like <name>_created since they have a dynamic timestamp which is annoying to test."

@@ -134,6 +134,31 @@ These metric types create a distribution based on observations.
 In all the above, if a metric was defined with one or more `:label-names`, an operation has to provide 
 a `:labels` map with an entry for every label name.
 
+
+## Generating output
+
+Use `(collect)` to get the state of a registry at a point in time.
+
+To satisfy the `/metrics` endpoint that a Prometheus server expects, create a route that returns
+the data in text format:
+
+```clojure
+(-> (collect) 
+    (serialize :text)) 
+
+; Returns lines of text like:
+; # HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+; # TYPE process_cpu_seconds_total counter
+; process_cpu_seconds_total 18.976212
+```
+
+Note that `(collect)` with no arguments will collect from the default-registry, but if passed any arguments,
+the default-registry needs to be explicitly provided:
+
+```clojure
+(collect my-registry default-registry)
+```
+
 ## Built-in collectors
 
 By default, fumi can expose [default collectors](https://github.com/prometheus/client_java#included-collectors) 
@@ -165,7 +190,6 @@ and provide them during `init!` or `register!`:
 (register! :version-info (io.prometheus.client.hotspot.VersionInfoExports.))
 ```
 
-
 ## Custom collectors
 
 On top of creating the standard metric collectors and performing operations on them based on some event,
@@ -189,28 +213,21 @@ as collection of metrics. You can directly pass in a function to `register!` or 
 
 You can also call `proxy-collector` with the same function to return a (not yet registered) `Collector` directly.
 
-## Generating output
+The provided function can return a single metric, or a collection of them.
 
-Use `(collect)` to get the state of a registry at a point in time.
+## Usage with pushgateway
 
-To satisfy the `/metrics` endpoint that a Prometheus server expects, create a route that returns
-the data in text format:
+Pushgateway is useful for instrumenting short-lived processes (e.g. batch jobs) that may
+not live long enough for metrics to be scraped.
 
+To use it, simply send the serialized output of `collect` to the gateway using your http client of choice:
+
+For example, using [hato](https://github.com/gnarroway/hato):
 ```clojure
-(-> (collect) 
-    (serialize :text)) 
-
-; Returns lines of text like:
-; # HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
-; # TYPE process_cpu_seconds_total counter
-; process_cpu_seconds_total 18.976212
-```
-
-Note that `(collect)` with no arguments will collect from the default-registry, but if passed any arguments,
-the default-registry needs to be explicitly provided:
-
-```clojure
-(collect my-registry default-registry)
+(hato.client/post "http://your-gateway.com/metrics/job/somejob/somelabel/foo"
+                  {:body (-> (fumi/collect)
+                             (fumi/serialize :text))
+                   :content-type "text/plain; version=0.0.4"})
 ```
 
 ## License
