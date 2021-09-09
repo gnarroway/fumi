@@ -1,7 +1,7 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
-## [Unreleased]
+## [0.3.0]
 ### Changed
 - **Breaking** Reimplemented internals as a wrapper of the Java client. This is to better prioritise performance
   as well as to keep up with changes to the monitoring ecosystem. 
@@ -28,8 +28,8 @@ All notable changes to this project will be documented in this file. This change
 ### Added
 - Initial release
 
-[Unreleased]: https://github.com/gnarroway/hato/compare/v0.2.0-b3...HEAD
-[0.3.0-b1]: https://github.com/gnarroway/hato/compare/v0.2.0-b3...v0.3.0-b1
+[Unreleased]: https://github.com/gnarroway/hato/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/gnarroway/hato/compare/v0.2.0-b3...v0.3.0
 [0.2.0-b3]: https://github.com/gnarroway/hato/compare/v0.2.0-b2...v0.2.0-b3
 [0.2.0-b2]: https://github.com/gnarroway/hato/compare/v0.2.0-b1...v0.2.0-b2
 [0.2.0-b1]: https://github.com/gnarroway/hato/compare/v0.1.0-beta1...v0.1.0-b1

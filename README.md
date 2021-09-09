@@ -23,7 +23,7 @@ Please try it out and raise any issues you may find.
 For Leinengen, add this to your project.clj:
 
 ```clojure
-[fumi "0.2.0-b4"]
+[fumi "0.3.0"]
 ```
 
 ## Getting started
