@@ -5,7 +5,9 @@
             [clojure.string :as string])
   (:import (io.prometheus.client Collector Collector$Type CollectorRegistry
                                  Collector$MetricFamilySamples Collector$MetricFamilySamples$Sample
-                                 Counter Gauge Histogram Summary)))
+                                 Counter Gauge Histogram Summary)
+           (io.prometheus.client.exporter.common TextFormat)
+           (java.io ByteArrayOutputStream)))
 
 ; We keep our own registry atom of the collectors so we can look them up by name
 (defonce collectors (atom nil))
@@ -240,6 +242,26 @@
                                     (sort-by (juxt :name :value)))}))
         (sort-by :name))))
 
+(defn- text-format-004
+  [registry]
+  (let [baos (ByteArrayOutputStream.)]
+    (with-open [w (clojure.java.io/writer baos)]
+      (TextFormat/write004 w (.metricFamilySamples registry)))
+    (String. (.toByteArray baos))))
+
+(defn collect-format
+  "Collects stats from one or more registries into a list of metrics.
+  Returns it as a string in the 0.0.4 text exposition format (to be extended in future)
+
+  Uses the default registry if no arguments are provided.
+  Otherwise, all desired registries (including the default) must be explicitly provided."
+  ([] (collect-format nil))
+  ([{:keys [registries] :or {registries [default-registry]}}]
+   (->> registries
+        (distinct)
+        (map text-format-004)
+        (string/join "\n"))))
+
 ;;; Serialization
 
 (defn- label-pair
@@ -259,7 +281,7 @@
   [metrics _]
   (str (->> metrics
             (map #(string/join "\n" (concat [(format "# HELP %s %s" (name (:name %)) (:help %))
-                                             (format "# TYPE %s %s" (name (:name %)) (name (:type %)))]
+                                             (format "# TYPE %s %s" (name (:name %)) (name (if (= :info (:type %)) :gauge (:type %))))]
 
                                             (map (partial metric-row (:name %)) (:samples %)))))
             (string/join "\n\n"))
@@ -349,7 +371,9 @@
 
   ;; Output
   (-> (collect)
-      (serialize :text)))
+      (serialize :text))
+  ; Directly using java client output
+  (collect-format))
 
 (comment
   ;; Create separate registry

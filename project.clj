@@ -1,4 +1,4 @@
-(defproject fumi "0.3.0"
+(defproject fumi "0.4.0-SNAPSHOT"
   :description "A Prometheus client for Clojure."
   :url "https://github.com/gnarroway/fumi"
   :license {:name         "The MIT License"
@@ -8,7 +8,8 @@
                                     :username      :env/clojars_user
                                     :password      :env/clojars_pass
                                     :sign-releases false}]]
-  :dependencies [[io.prometheus/simpleclient "0.12.0"]]
+  :dependencies [[io.prometheus/simpleclient "0.12.0"]
+                 [io.prometheus/simpleclient_common "0.12.0"]]
   :plugins [[lein-cljfmt "0.6.6"]]
 
   :profiles {:dev {:dependencies [[org.clojure/clojure "1.10.1"]
