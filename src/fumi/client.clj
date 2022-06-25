@@ -92,7 +92,7 @@
     (cond-> b
       (:label-names opts) (.labelNames (into-array String (map core/name (:label-names opts))))
       (and (= :histogram (:type opts))
-           (:buckets opts)) (.buckets (into-array Double (map double (:buckets opts))))
+           (:buckets opts)) (.buckets (double-array (map double (:buckets opts))))
       true (.create))))
 
 (defn register!

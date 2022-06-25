@@ -510,3 +510,27 @@
               "h_sum{foo=\"foo\",bar=\"bar\"} 1.0\n")
          (-> (map without-created-sample (fc/collect)) (fc/serialize :text)))))
 
+(deftest ^:integration test-histogram-with-buckets
+  (fc/init! {:collectors {:hb {:type :histogram :buckets [1.0 2.0] :help "hb"}}})
+  (is (= [{:help "hb"
+           :name "hb"
+           :samples [{:labels {"le" "1.0"}, :name "hb_bucket", :value 0.0}
+                     {:labels {"le" "2.0"}, :name "hb_bucket", :value 0.0}
+                     {:labels {"le" "+Inf"}, :name "hb_bucket", :value 0.0}
+                     {:name "hb_count", :value 0.0}
+                     {:name "hb_sum", :value 0.0}]
+           :type :histogram}]
+         (map without-created-sample (fc/collect))))
+  (fc/observe! :hb 0.5 {})
+  (fc/observe! :hb 1.5 {})
+  (fc/observe! :hb 2.5 {})
+  (is (= [{:help    "hb"
+           :name    "hb"
+           :samples [{:labels {"le" "1.0"}, :name "hb_bucket", :value 1.0}
+                     {:labels {"le" "2.0"}, :name "hb_bucket", :value 2.0}
+                     {:labels {"le" "+Inf"}, :name "hb_bucket", :value 3.0}
+                     {:name "hb_count", :value 3.0}
+                     {:name "hb_sum", :value 4.5}]
+           :type    :histogram}]
+         (map without-created-sample (fc/collect)))))
+
