@@ -1,9 +1,9 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
-## [0.3.1] 2022-06-26
+## [0.3.1]
 ### Fixed
-- Type coercion for histogram buckets (#4)
+- fix bucket creation for histogram (#4 thanks @aarongroom)
 
 ## [0.3.0]
 ### Changed
@@ -31,8 +31,9 @@ All notable changes to this project will be documented in this file. This change
 ### Added
 - Initial release
 
-[Unreleased]: https://github.com/gnarroway/hato/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/gnarroway/hato/compare/v0.2.0-b3...v0.3.0
-[0.2.0-b3]: https://github.com/gnarroway/hato/compare/v0.2.0-b2...v0.2.0-b3
-[0.2.0-b2]: https://github.com/gnarroway/hato/compare/v0.2.0-b1...v0.2.0-b2
-[0.2.0-b1]: https://github.com/gnarroway/hato/compare/v0.1.0-beta1...v0.1.0-b1
+[Unreleased]: https://github.com/gnarroway/fumi/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/gnarroway/fumi/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/gnarroway/fumi/compare/v0.2.0-b3...v0.3.0
+[0.2.0-b3]: https://github.com/gnarroway/fumi/compare/v0.2.0-b2...v0.2.0-b3
+[0.2.0-b2]: https://github.com/gnarroway/fumi/compare/v0.2.0-b1...v0.2.0-b2
+[0.2.0-b1]: https://github.com/gnarroway/fumi/compare/v0.1.0-beta1...v0.1.0-b1
