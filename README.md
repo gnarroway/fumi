@@ -15,15 +15,21 @@ Features:
 
 ## Status
 
-fumi is under active development and may experience breaking changes. 
+fumi is used in production and the API should remain fairly stable. 
 Please try it out and raise any issues you may find.
 
 ## Usage
 
+For tools.deps, add this to your deps.edn:
+
+```clojure
+{fumi/fumi {:mvn/version "0.3.1"}}
+```
+
 For Leinengen, add this to your project.clj:
 
 ```clojure
-[fumi "0.3.0"]
+[fumi "0.3.1"]
 ```
 
 ## Getting started
