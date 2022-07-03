@@ -8,13 +8,12 @@ All notable changes to this project will be documented in this file. This change
 ## [0.3.0]
 ### Changed
 - **Breaking** Reimplemented internals as a wrapper of the Java client. This is to better prioritise performance
-  as well as to keep up with changes to the monitoring ecosystem. 
+  as well as to keep up with changes to the monitoring ecosystem.
   The public API is mostly the same except as documented  below
 - the need to opt *in* to `:default-exports?` (instead of opt *out* via `:exclude-defaults`)
 - custom collectors can be created directly with a function without reifying a protocol
 - the Java client automatically adds _created samples and _total suffixes (to counter samples) for open tracing compatibility
   These are passed through as they are so the final output may be slightly different.
-
 
 ## [0.2.0-b3] 2020-08-11
 ### Fixed

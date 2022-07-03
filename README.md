@@ -10,7 +10,7 @@ Features:
 - Simple wrapper of the official [java client](https://github.com/prometheus/client_java)
 - Supports all prometheus metric types (counter, gauge, summary, histogram)
 - Built in exporters for JVM / process metrics (additional dep required)
-- Supports central configuration as well as creating collectors next to the code they instrument.
+- Supports central configuration as well as creating collectors next to the code they instrument
 - Supports custom collectors implemented as functions
 
 ## Status
@@ -26,7 +26,7 @@ For tools.deps, add this to your deps.edn:
 {fumi/fumi {:mvn/version "0.3.1"}}
 ```
 
-For Leinengen, add this to your project.clj:
+For Leiningen, add this to your project.clj:
 
 ```clojure
 [fumi "0.3.1"]
@@ -66,7 +66,7 @@ Typically using the default registry is sufficient.
 fumi also allows you to use separate registries or hold onto references. This may be useful for:
 
 - injecting via component-style systems
-- for using with push gateway
+- for using with pushgateway
 - test isolation
 
 In this case, the registry (i.e. result of calling `init!`) must be passed in as the `:registry` option
@@ -139,7 +139,6 @@ These metric types create a distribution based on observations.
 
 In all the above, if a metric was defined with one or more `:label-names`, an operation has to provide 
 a `:labels` map with an entry for every label name.
-
 
 ## Generating output
 
